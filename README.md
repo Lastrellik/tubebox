@@ -1,0 +1,446 @@
+# TubeBox
+
+**Turn online videos into a curated, kid-friendly offline Kodi library.**
+
+TubeBox is a small CLI that automates downloading permitted online videos with `yt-dlp`, organizing them for Kodi, fetching artwork, and saving everything directly to a local media server or Raspberry Pi.
+
+The goal is simple: paste a video URL and end up with a clean, visual media library that young kids can navigate without needing access to the original streaming service.
+
+## Why TubeBox?
+
+Kodi is great for a controlled offline media library, but getting online videos into a polished Kodi library involves a surprising amount of manual work:
+
+- Download the video
+- Choose an appropriate format
+- Download the thumbnail
+- Rename the thumbnail for Kodi
+- Organize videos into sensible folders
+- Find artwork for those folders
+- Copy everything to the media server
+- Keep filenames consistent
+
+TubeBox handles that workflow automatically.
+
+## Install and Set Up
+
+TubeBox runs on macOS and Linux with Python 3.10 or newer. Install
+`yt-dlp`, `ffmpeg` (which includes `ffprobe`), and `curl` first.
+
+On macOS with Homebrew:
+
+```bash
+brew install python yt-dlp ffmpeg curl deno
+```
+
+On Debian/Ubuntu or Raspberry Pi OS:
+
+```bash
+sudo apt update
+sudo apt install python3 python3-venv ffmpeg curl pipx
+pipx install yt-dlp
+pipx ensurepath
+```
+
+Open a new terminal after `pipx ensurepath` so `yt-dlp` is on your PATH.
+Use an up-to-date yt-dlp: source websites change frequently. See the
+[official yt-dlp installation instructions](https://github.com/yt-dlp/yt-dlp#installation)
+for other platforms and any additional requirements for your source site.
+YouTube also needs a supported JavaScript runtime and yt-dlp's EJS component;
+see the [official EJS setup guide](https://github.com/yt-dlp/yt-dlp/wiki/EJS).
+The Homebrew setup above includes Deno; pipx users should install
+`pipx install 'yt-dlp[default]'` instead of the plain yt-dlp package and
+install a runtime following that guide.
+
+From this repository, install TubeBox into a virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install .
+tubebox --help
+```
+
+Activate this environment in each new terminal. Alternatively, if you use
+`pipx`, run `pipx install .` to make `tubebox` available without activation.
+TubeBox itself has no third-party Python runtime dependencies.
+
+Mount your network share and create your library folder on it, then run:
+
+```bash
+tubebox init /Volumes/Kodi/YouTube
+# Linux example:
+# tubebox init /mnt/kodi/YouTube
+```
+
+You can also run `tubebox init` and enter the path when prompted. The folder
+must already exist. TubeBox does not mount SMB shares or store SMB credentials;
+mount the share using your operating system first.
+
+For an intentionally local library, use:
+
+```bash
+mkdir -p ~/Videos/TubeBox
+tubebox init --local ~/Videos/TubeBox
+```
+
+Setup saves `~/.config/tubebox/config.ini` (or
+`$XDG_CONFIG_HOME/tubebox/config.ini` when set). It stores the destination,
+storage mode, mount path, library identifier, and preferred resolution. A small `.tubebox-library`
+marker in the destination identifies the configured library. Rerun `init`
+to change the destination; no source code edits are needed.
+
+For a separate configuration, put `--config` before the command:
+
+```bash
+tubebox --config ./family.ini init /Volumes/Kodi/YouTube
+tubebox --config ./family.ini add "<permitted-video-url>"
+```
+
+## Preferred Resolution
+
+Choose a resolution during interactive setup, or save it directly:
+
+```bash
+tubebox init /Volumes/Kodi/YouTube --resolution 1080p
+# Update the existing library's preference:
+tubebox init --resolution 720p
+# Use the highest available resolution up to 1080p:
+tubebox init --resolution best
+```
+
+Every subsequent `tubebox add` uses this setting. New configurations default
+to **1080p**. All downloads are capped at 1080p, including older configurations
+set to `best` or a higher resolution. Lower configured limits still apply. Enter accepts the current value
+during setup. Updating the existing library preserves its destination and
+local/network storage mode.
+
+The preference is a maximum video height: `1080p` selects the best available
+format up to 1080 pixels high, falling back to a lower resolution when needed.
+It does not upscale or resize videos. If all formats exceed the limit or
+their heights are unknown, the download fails instead of exceeding the limit;
+choose a source with a known resolution within the limit. Existing downloaded videos are not changed.
+
+You can also edit `resolution = 1080` in the `[library]` section of your
+config file. Values such as `720`, `1080p`, `1440p`, `2160p`, and `best` are
+accepted.
+
+## Example
+
+For example, suppose you're downloading a NASA video that you're permitted to store locally.
+
+Run:
+
+```bash
+tubebox add "https://www.youtube.com/watch?v=..."
+```
+
+TubeBox retrieves the video's metadata and presents sensible defaults:
+
+```text
+Title:   Mars Rover Overview
+Channel: NASA
+
+Folder [NASA]:
+Video name [Mars Rover Overview]:
+Season number (optional):
+Episode number (optional):
+```
+
+Press Enter to accept the defaults.
+
+TubeBox then creates:
+
+```text
+YouTube/
+└── NASA/
+    ├── poster.jpg
+    ├── Mars Rover Overview.mp4
+    └── Mars Rover Overview-thumb.jpg
+```
+
+The titles shown above are illustrative examples.
+
+## Kid-Friendly by Design
+
+TubeBox is designed around a simple idea:
+
+**Kids should be able to recognize what they want before they have to read it.**
+
+Videos can be grouped by creator, collection, or category:
+
+```text
+YouTube/
+├── NASA/
+│   ├── poster.jpg
+│   ├── Mars Rover Overview.mp4
+│   ├── Mars Rover Overview-thumb.jpg
+│   ├── Exploring the Moon.mp4
+│   └── Exploring the Moon-thumb.jpg
+│
+├─ Space/
+│   ├── poster.jpg
+│   └── ...
+│
+└── Science/
+    ├── poster.jpg
+    └── ...
+```
+
+Each folder can have its own `poster.jpg`, while every video gets its own thumbnail.
+
+This allows Kodi to present a visual library instead of an enormous flat list of filenames.
+
+## Automatic Artwork
+
+TubeBox uses artwork exposed by the source whenever possible.
+
+For each video, TubeBox can:
+
+- Download the video's thumbnail
+- Convert it to JPEG
+- Rename it using Kodi's `-thumb.jpg` convention
+
+For creator/channel folders, TubeBox tries to retrieve available channel artwork and saves it as:
+
+```text
+poster.jpg
+```
+
+Existing folder artwork is preserved rather than downloaded repeatedly.
+If the source does not expose usable creator artwork, TubeBox uses the
+video thumbnail for the folder poster. If the video thumbnail cannot be
+downloaded and converted, the video is not added.
+
+## Optional Episodes
+
+Not every online video is a TV episode, so TubeBox does not force everything into TV-style numbering.
+
+A normal video can simply be:
+
+```text
+Mars Rover Overview.mp4
+Mars Rover Overview-thumb.jpg
+```
+
+For genuinely episodic content, season and episode numbers can optionally be supplied:
+
+```text
+Space Science - S01E04.mp4
+Space Science - S01E04-thumb.jpg
+```
+
+This allows ordinary videos and structured series to coexist without unnecessarily treating every video as a television episode.
+
+## Local Processing and Network Storage
+
+TubeBox prepares videos locally, then transfers completed files to mounted
+network storage.
+
+For example:
+
+```text
+/mnt/kodi/YouTube
+```
+
+or on macOS:
+
+```text
+/Volumes/Kodi/YouTube
+```
+
+A Raspberry Pi or other media server can expose its storage over SMB, and TubeBox treats the mounted share like a normal directory.
+
+`tubebox add` handles both processing and transfer automatically. yt-dlp,
+ffmpeg, and artwork downloads run entirely inside a local temporary working
+directory. They never use the configured media destination as a working
+filesystem, avoiding issues with download and conversion operations on
+macOS-mounted SMB volumes.
+
+If the configured destination is unavailable, TubeBox fails rather than silently downloading files somewhere else.
+
+In network mode, TubeBox checks that the configured mount is present and
+that the library marker matches before downloading and before publishing.
+Local mode still requires the existing destination and matching marker.
+Network mode expects a separate filesystem mount, as with normal SMB mounts
+on macOS and Linux; unusual bind-mount or automount arrangements may need
+to be mounted explicitly before setup.
+
+Local working directories use Python's system temporary location (normally
+the macOS user temporary directory or `/tmp` on Linux). Keep this location
+on local storage; TubeBox rejects a temporary location inside the configured
+media destination or its network mount. Local storage needs enough free space
+for the video, audio, artwork, and merging/conversion intermediates.
+
+Only after the final video and thumbnail are present and non-empty does
+TubeBox create the creator/category directory and transfer files. Copies use
+hidden `.tubebox-transfer-*.tmp` names in that directory. After each copy closes
+and its size is checked, TubeBox reserves the final name without overwriting
+existing files and renames the completed copy into place on the same share.
+The rename is atomic on filesystems that support atomic rename; failures
+abort the transfer rather than falling back to copying into the final name.
+
+Ordinary download or transfer failures clean up local work and temporary
+destination copies and roll back newly added files. Existing video names
+are rejected; choose a different `--name` to keep both versions. yt-dlp partial
+downloads and ffmpeg intermediate files are never transferred to the share.
+
+An abrupt process kill, power loss, or disconnected share can prevent
+cleanup. After checking that no TubeBox process is running, remove any
+leftover local `tubebox-*` working directories, destination
+`.tubebox-transfer-*.tmp` files, and the affected folder's `.tubebox-lock`
+directory. Inspect any empty reserved final filenames before retrying.
+Keep the `.tubebox-library` marker. Filesystem writes across video and
+artwork are not a single atomic transaction.
+
+## Dependencies
+
+TubeBox uses:
+
+- `yt-dlp`
+- `ffmpeg` and `ffprobe`
+- Python 3.10+
+- `curl`
+
+`yt-dlp` handles media extraction and metadata, while `ffmpeg` handles media and image conversion where necessary.
+
+## Project Goals
+
+TubeBox aims to be:
+
+- **Simple** - paste a URL and accept sensible defaults
+- **Visual** - automatically provide artwork useful for kid-friendly navigation
+- **Offline-first** - downloaded media remains locally playable
+- **Kodi-friendly** - predictable filenames and artwork conventions
+- **Network-aware** - save directly to mounted media storage
+- **Safe to fail** - never silently dump media somewhere unintended when network storage is unavailable
+- **Maintainable** - favor straightforward behavior over unnecessary complexity
+
+TubeBox checks for all four external executables before contacting a
+video source. Installation commands are in **Install and Set Up** above.
+
+## CLI
+
+The primary interface is:
+
+```bash
+tubebox add <url>
+```
+
+Accept the creator and title defaults without prompts:
+
+```bash
+tubebox add "<permitted-video-url>" --yes
+```
+
+Override names or add optional episode numbers:
+
+```bash
+tubebox add "<permitted-video-url>" --folder "Space" --name "My Telescope Tour"
+tubebox add "<permitted-video-url>" --name "My Astronomy Series" --season 1 --episode 4
+```
+
+Season and episode numbers may also be supplied individually. Enter skips
+optional numbers in interactive use. Piped/noninteractive commands use
+defaults automatically. Playlists and channel URLs are rejected: add one
+video at a time. Video URLs must use HTTP or HTTPS.
+
+TubeBox keeps yt-dlp's normal best-video-plus-audio selection with a strict
+1080p ceiling (or your lower configured limit). It prefers H.264/AVC video
+and AAC audio using codec sorting, and checks selected formats for download
+availability. These are preferences, not requirements: Opus and other codecs
+remain eligible. Availability checks cannot catch every mid-download failure.
+
+If the preferred download fails with HTTP 403, TubeBox retries once in a
+fresh local directory without codec sorting preferences, retaining the same
+resolution ceiling. This lets yt-dlp select its normal audio choice, including
+Opus. No format IDs, browser cookies, or YouTube login are required.
+
+Separate video/audio streams are merged into MKV by ffmpeg using stream
+copying. Already combined videos keep their original container, including
+MP4 or WebM. TubeBox does not transcode video or audio or force MP4 output;
+Kodi/LibreELEC can use the resulting codecs and containers. TubeBox uses its own
+yt-dlp options, ignoring global yt-dlp configuration for predictable
+output. Names are sanitized for common SMB and Windows restrictions.
+
+`list` and `sync` are future possibilities, not implemented commands.
+
+## Development and Tests
+
+If both download attempts fail with `HTTP Error 403: Forbidden`, the source
+rejected the requests. Changing the library path or rerunning `init` will not fix that
+response. Update your downloader and retry. For Homebrew installations:
+
+```bash
+brew update
+brew upgrade yt-dlp deno
+```
+
+TubeBox displays yt-dlp warnings, including warnings from metadata retrieval.
+If the problem persists after updating, those diagnostics help distinguish
+source restrictions from extractor problems. TubeBox does not automatically
+read browser cookies or change your installed tools.
+
+Run directly from the checkout without installing TubeBox:
+
+```bash
+python3 -m tubebox --help
+python3 -m unittest discover -s tests -v
+```
+
+The tests use Python's standard library and simulated downloader output;
+they require no network access or downloaded media. They cover config,
+unavailable mounts, library identity, naming, duplicate protection,
+artwork preservation, resolution configuration, and cleanup after failures.
+When yt-dlp is installed, additional tests exercise its real format selection
+using synthetic metadata, without network access or media downloads; otherwise
+those tests are skipped. They do not replace
+an end-to-end check with your actual mounted share and a video you own
+or are permitted to download.
+
+## Kodi
+
+TubeBox does not replace Kodi.
+
+It prepares and organizes media so Kodi can provide the actual playback and kid-friendly browsing interface.
+
+A typical setup looks like:
+
+```text
+Internet
+   |
+   v
+ TubeBox
+   |
+   | yt-dlp
+   v
+SMB Media Share
+   |
+   v
+Raspberry Pi
+   |
+   v
+  Kodi
+   |
+   v
+Kid-friendly offline library
+```
+
+## Content and Copyright
+
+TubeBox is a media-management tool. It does not include or distribute downloaded media.
+
+TubeBox is intended for content that the user has the right or permission to download and store, such as:
+
+- Content created by the user
+- Public-domain content
+- Appropriately licensed content
+- Content for which the copyright holder has granted permission
+- Other content the user is legally entitled to download and store
+
+Users are responsible for determining whether they have permission to download particular content and for complying with applicable laws, licenses, and service terms.
+
+Examples in this README are illustrative and do not imply that every video hosted by a particular service, channel, or organization has the same copyright or licensing status.
+
+## License
+
+TubeBox is licensed under the MIT License.
