@@ -92,15 +92,46 @@ def stream_plan(info):
     return maps, conversions, subtitle_codecs, warnings
 
 
-def encode_command(source, output, info, preview=False):
+def encode_command(source, output, info, preview=False, encoder='cpu'):
     maps, conversions, _, _ = stream_plan(info)
+    if encoder == 'nvenc':
+        video_options = ['-c:v', 'h264_nvenc', '-preset', 'p5', '-tune', 'hq',
+                         '-rc', 'vbr', '-cq', '20', '-b:v', '0']
+    elif encoder == 'cpu':
+        video_options = ['-c:v', 'libx264', '-preset', 'medium', '-crf', '20']
+    else:
+        raise TubeBoxError(f'Unknown encoder: {encoder}')
     command = ['ffmpeg', '-nostdin', '-hide_banner', '-xerror', '-noautorotate', '-i', str(source),
                *maps, '-map_metadata', '0', '-map_chapters', '0', '-c', 'copy',
-               '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p',
+               *video_options, '-pix_fmt', 'yuv420p',
                '-vf', SCALE, '-fps_mode:v', 'passthrough', '-c:a', 'copy', '-c:s', 'copy', *conversions]
     if preview:
         command += ['-t', '1']
     return command + ['-f', 'matroska', '-n', str(output)]
+
+
+def select_encoder(source, info, work, total, requested, verbose=False):
+    """Test the actual input and stream mappings, not just advertised encoders."""
+    if requested not in ('auto', 'cpu', 'nvenc'):
+        raise TubeBoxError(f'Unknown encoder: {requested}')
+    candidates = ('nvenc', 'cpu') if requested == 'auto' else (requested,)
+    preview = work / 'preview.mkv'
+    for candidate in candidates:
+        print(f'      Checking {candidate} encoder and stream/container compatibility...', flush=True)
+        try:
+            encode(encode_command(source, preview, info, preview=True, encoder=candidate),
+                   work, total, verbose, progress=False)
+            return candidate
+        except TubeBoxError as exc:
+            if requested == 'auto' and candidate == 'nvenc':
+                print(f'      NVIDIA encoding unavailable for this file; falling back to CPU. {exc}', file=sys.stderr)
+            elif candidate == 'nvenc':
+                raise TubeBoxError(f'NVIDIA encoding failed; original preserved. '
+                                   f'Use --encoder auto or --encoder cpu to allow CPU encoding. {exc}') from exc
+            else:
+                raise
+        finally:
+            preview.unlink(missing_ok=True)
 
 
 def encode(command, work, total, verbose=False, progress=True):
@@ -207,7 +238,7 @@ def discover(path):
     return files
 
 
-def normalize_file(source, dry_run=False, verbose=False):
+def normalize_file(source, dry_run=False, verbose=False, encoder='auto'):
     temp_root = Path(tempfile.gettempdir()).resolve()
     source_mount = enclosing_mount(source)
     if (temp_root.is_relative_to(source.parent) or
@@ -237,19 +268,17 @@ def normalize_file(source, dry_run=False, verbose=False):
         total = duration(info)
         print(f'      -> {target}' + (' (original retained)' if warnings else ' (replaces original)'))
         if dry_run:
+            print(f'      Encoder: {encoder}' + (' (NVIDIA availability checked when encoding; CPU fallback)' if encoder == 'auto' else ''))
             return 'would normalize'
         print('      Copying source to local workspace...', flush=True)
         local_source = work / ('source' + source.suffix)
         shutil.copyfile(source, local_source)
         if file_identity(source) != identity or local_source.stat().st_size != identity[2]:
             raise TubeBoxError('Source changed during copying; original preserved.')
-        print('      Checking stream/container compatibility...', flush=True)
-        preview = work / 'preview.mkv'
-        encode(encode_command(local_source, preview, info, preview=True), work, total, verbose, progress=False)
-        preview.unlink()
+        selected = select_encoder(local_source, info, work, total, encoder, verbose)
         output = work / 'normalized.mkv'
-        print('      Encoding...', flush=True)
-        encode(encode_command(local_source, output, info), work, total, verbose)
+        print(f'      Encoding with {"NVIDIA GPU (h264_nvenc)" if selected == "nvenc" else "CPU (libx264)"}...', flush=True)
+        encode(encode_command(local_source, output, info, encoder=selected), work, total, verbose)
         if not output.is_file() or not output.stat().st_size:
             raise TubeBoxError('ffmpeg produced no output; original preserved.')
         print('      Validating...', flush=True)
@@ -272,7 +301,7 @@ def normalize(args):
     for index, source in enumerate(files, 1):
         print(f'\n[{index}/{len(files)}] {source}', flush=True)
         try:
-            result = normalize_file(source, args.dry_run, args.verbose)
+            result = normalize_file(source, args.dry_run, args.verbose, args.encoder)
             if result == 'would normalize':
                 planned += 1
             else:

@@ -54,8 +54,11 @@ rename on the destination filesystem; never encode directly onto SMB.
 - Recursively inspect supported video files and process them sequentially.
 - Skip compatible primary video streams without modifying the source:
   H.264/AVC, 8-bit yuv420p, width <=1920 and height <=1080.
-- Normalize incompatible video using libx264, preset medium, CRF 20,
-  yuv420p, and MKV output. Never upscale; preserve aspect ratio and timing.
+- Normalize incompatible video with automatic NVIDIA NVENC selection,
+  falling back to libx264 when the local preview fails. Support explicit
+  NVENC and CPU modes. Use NVENC preset p5, HQ tuning, VBR CQ 20, or
+  libx264 preset medium, CRF 20. Always use 8-bit yuv420p and MKV output.
+  Never upscale; preserve aspect ratio and timing.
 - Copy every supported audio/subtitle stream, chapters, attachments, and
   useful metadata. Report unsupported streams before a long encode and
   retain the original when a stream cannot be preserved.

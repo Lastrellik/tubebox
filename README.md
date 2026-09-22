@@ -384,11 +384,37 @@ transfer files are excluded from recursive discovery.
 The Pi 3 house format is **H.264/AVC, 8-bit yuv420p, no wider than 1920 pixels
 and no taller than 1080 pixels**. If the primary video stream already meets
 that target, the file is left untouched, regardless of container. Otherwise,
-TubeBox explains the incompatibility and encodes with `libx264`,
-`-preset medium`, `-crf 20`, and `-pix_fmt yuv420p` into MKV. It preserves
+TubeBox explains the incompatibility and automatically tries NVIDIA GPU
+encoding (`h264_nvenc`). It tests a one-second preview of the actual staged
+input, so having an encoder listed by ffmpeg alone is not enough. If that
+preview fails, it reports the reason and retries with CPU encoding (`libx264`).
+No GPU model lookup, `nvidia-smi`, or extra Python packages are required.
+Other GPU vendors currently use the CPU fallback.
+
+Use an explicit encoder when desired:
+
+```bash
+tubebox normalize /mnt/kodi/Movies --encoder nvenc  # Require NVIDIA; fail safely if unavailable
+tubebox normalize /mnt/kodi/Movies --encoder cpu    # Always use CPU
+```
+
+NVIDIA encoding requires a working NVIDIA driver and ffmpeg built with
+`h264_nvenc`. It uses preset `p5`, HQ tuning, VBR with target CQ 20, and no
+fixed average bitrate. CPU encoding retains preset `medium` and CRF 20.
+CQ and CRF are different quality controls; GPU output can differ in size
+and quality from CPU output. The GPU performs video encoding; decoding,
+resizing, and pixel format conversion remain on the CPU.
+See [NVIDIA's FFmpeg guide](https://docs.nvidia.com/video-technologies/video-codec-sdk/13.1/ffmpeg-with-nvidia-gpu/index.html).
+
+Both encoders produce 8-bit `yuv420p` H.264 in MKV. TubeBox preserves
 frame timing without forcing a new frame rate, retains display aspect ratio,
 and scales down only as needed (rounding dimensions down to even pixels).
 It does not upscale or perform HDR-to-SDR tone mapping.
+
+`--dry-run` reports the requested encoder without testing the GPU or encoding.
+Compatible files are skipped without initializing an encoder. Automatic
+fallback happens during the preview only: a failure during the full encode
+preserves the source and is reported, without starting another long encode.
 
 All audio streams are copied without re-encoding. Supported subtitle streams
 (SRT, ASS/SSA, WebVTT, DVD, DVB, and PGS) are copied; MP4 `mov_text` captions
@@ -475,6 +501,12 @@ additional tests generate tiny synthetic videos locally to verify real
 10-bit conversion, downscaling, fractional frame rates, multiple audio and
 subtitle tracks, chapters, metadata, and `mov_text` conversion. These temporary
 fixtures are deleted after each test and are never shipped with TubeBox.
+
+To include real NVIDIA GPU tests (synthetic local media only):
+
+```bash
+TUBEBOX_TEST_NVENC=1 python3 -m unittest discover -s tests -v
+```
 
 ## Kodi
 

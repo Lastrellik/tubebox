@@ -57,6 +57,16 @@ class CompatibilityTests(unittest.TestCase):
         self.assertEqual(subtitles, [])
         self.assertIn('keeping the original', warnings[0])
 
+    def test_nvenc_uses_quality_mode_and_preserves_output_constraints(self):
+        command = n.encode_command(Path('/local/in.mkv'), Path('/local/out.mkv'), media(), encoder='nvenc')
+        for option, value in (('-c:v', 'h264_nvenc'), ('-preset', 'p5'), ('-cq', '20'),
+                              ('-rc', 'vbr'), ('-b:v', '0'), ('-pix_fmt', 'yuv420p'),
+                              ('-fps_mode:v', 'passthrough'), ('-f', 'matroska')):
+            self.assertEqual(command[command.index(option) + 1], value)
+        self.assertNotIn('-crf', command)
+        self.assertIn('0:a?', command)
+        self.assertIn('0:t?', command)
+
     def test_validation_rejects_bad_output(self):
         original = media()
         good = media('h264', 'yuv420p')
@@ -98,9 +108,69 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(input_path.read_bytes(), self.original)
         Path(command[-1]).write_bytes(b'normalized-media')
 
-    def run_file(self, dry=False, encoder=None, probe_info=None):
+    def run_file(self, dry=False, encoder=None, probe_info=None, mode='auto'):
         with patch.object(n, 'probe', side_effect=probe_info or [self.input, self.output]), patch.object(n, 'encode', side_effect=encoder or self.fake_encode), redirect_stdout(io.StringIO()):
-            return n.normalize_file(self.source, dry_run=dry)
+            return n.normalize_file(self.source, dry_run=dry, encoder=mode)
+
+    def test_auto_uses_nvenc_after_successful_preview(self):
+        calls = []
+        def encode(command, work, *args, **kwargs):
+            calls.append(command[command.index('-c:v') + 1])
+            self.fake_encode(command, work)
+        self.assertEqual(self.run_file(encoder=encode), 'normalized')
+        self.assertEqual(calls, ['h264_nvenc', 'h264_nvenc'])
+
+    def test_auto_cleans_failed_gpu_preview_and_falls_back(self):
+        calls = []
+        def encode(command, work, *args, **kwargs):
+            codec = command[command.index('-c:v') + 1]
+            calls.append(codec)
+            self.assertFalse(Path(command[-1]).exists())
+            self.fake_encode(command, work)
+            if codec == 'h264_nvenc':
+                raise storage.TubeBoxError('No capable device found')
+        with redirect_stderr(io.StringIO()) as errors:
+            self.assertEqual(self.run_file(encoder=encode), 'normalized')
+        self.assertEqual(calls, ['h264_nvenc', 'libx264', 'libx264'])
+        self.assertIn('falling back to CPU', errors.getvalue())
+        self.assertTrue(all(not work.exists() for work in self.workspaces))
+
+    def test_explicit_nvenc_failure_preserves_source_without_cpu_retry(self):
+        calls = []
+        def fail(command, work, *args, **kwargs):
+            calls.append(command[command.index('-c:v') + 1])
+            raise storage.TubeBoxError('GPU unavailable')
+        with self.assertRaisesRegex(storage.TubeBoxError, 'NVIDIA encoding failed'):
+            self.run_file(encoder=fail, mode='nvenc')
+        self.assertEqual(calls, ['h264_nvenc'])
+        self.assertEqual(self.source.read_bytes(), self.original)
+
+    def test_explicit_cpu_does_not_try_gpu(self):
+        calls = []
+        def encode(command, work, *args, **kwargs):
+            calls.append(command[command.index('-c:v') + 1])
+            self.fake_encode(command, work)
+        self.assertEqual(self.run_file(encoder=encode, mode='cpu'), 'normalized')
+        self.assertEqual(calls, ['libx264', 'libx264'])
+
+    def test_gpu_failure_during_full_encode_preserves_source(self):
+        calls = []
+        def encode(command, work, *args, **kwargs):
+            calls.append(command[command.index('-c:v') + 1])
+            self.fake_encode(command, work)
+            if '-t' not in command:
+                raise storage.TubeBoxError('GPU lost')
+        with self.assertRaisesRegex(storage.TubeBoxError, 'GPU lost'):
+            self.run_file(encoder=encode)
+        self.assertEqual(calls, ['h264_nvenc', 'h264_nvenc'])
+        self.assertEqual(self.source.read_bytes(), self.original)
+        self.assertTrue(all(not work.exists() for work in self.workspaces))
+
+    def test_dry_run_does_not_test_or_use_gpu(self):
+        with patch.object(n, 'select_encoder') as select:
+            self.assertEqual(self.run_file(dry=True), 'would normalize')
+        select.assert_not_called()
+
 
     def test_compatible_is_untouched(self):
         identity = storage.file_identity(self.source)
@@ -229,7 +299,7 @@ class WorkflowTests(unittest.TestCase):
     def test_directory_continues_after_failure(self):
         other = self.root / 'second.mkv'
         other.write_bytes(b'video')
-        args = argparse.Namespace(path=self.root, dry_run=False, verbose=False)
+        args = argparse.Namespace(path=self.root, dry_run=False, verbose=False, encoder='auto')
         with patch.object(n.shutil, 'which', return_value='/tool'), patch.object(n, 'normalize_file', side_effect=[storage.TubeBoxError('bad'), 'compatible']) as run, redirect_stdout(io.StringIO()) as output, redirect_stderr(io.StringIO()):
             self.assertEqual(n.normalize(args), 1)
             self.assertEqual(run.call_count, 2)
