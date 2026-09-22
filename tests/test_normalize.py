@@ -122,6 +122,21 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(self.workspaces)
         self.assertTrue(all(not work.is_relative_to(self.root) for work in self.workspaces))
 
+    def test_local_tmpfs_can_hold_source_and_separate_workspace(self):
+        mount = self.root.parent
+        mountinfo = f'1 0 0:1 / {mount} rw - tmpfs tmpfs rw\n'
+        with patch.object(n, 'enclosing_mount', return_value=mount), patch.object(Path, 'read_text', return_value=mountinfo):
+            self.assertEqual(self.run_file(), 'normalized')
+        self.assertTrue(self.workspaces)
+
+    def test_network_mount_cannot_hold_temporary_workspace(self):
+        mount = self.root.parent
+        mountinfo = f'1 0 0:1 / {mount} rw - cifs //server/share rw\n'
+        with patch.object(n, 'enclosing_mount', return_value=mount), patch.object(Path, 'read_text', return_value=mountinfo):
+            with self.assertRaisesRegex(storage.TubeBoxError, 'Temporary storage must be local'):
+                self.run_file()
+        self.assertEqual(self.source.read_bytes(), self.original)
+
     def test_uppercase_mkv_keeps_exact_filename(self):
         self.source = self.source.rename(self.root / 'Movie.MKV')
         self.run_file()

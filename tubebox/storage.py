@@ -103,6 +103,22 @@ def enclosing_mount(path):
     raise TubeBoxError('Cannot determine the destination mount.')
 
 
+def known_local_mount(mount):
+    """Recognize Linux local mounts; keep conservative behavior when unknown."""
+    try:
+        entries = Path('/proc/self/mountinfo').read_text().splitlines()
+    except OSError:
+        return False
+    for entry in reversed(entries):
+        fields = entry.split()
+        mount_path = re.sub(r'\\([0-7]{3})', lambda match: chr(int(match[1], 8)), fields[4])
+        if Path(mount_path) == mount:
+            filesystem = fields[fields.index('-') + 1]
+            return filesystem in {'tmpfs', 'ramfs', 'ext2', 'ext3', 'ext4', 'btrfs',
+                                  'xfs', 'zfs', 'f2fs', 'vfat', 'exfat', 'ntfs3', 'overlay'}
+    return False
+
+
 def check_destination(config):
     destination = Path(config['destination'])
     if not destination.is_absolute() or not destination.is_dir():
@@ -158,8 +174,15 @@ def initialize(path, destination, local=False, preferred_resolution='1080'):
                   mount=str(mount), library_id=library_id, resolution=preferred_resolution)
     check_destination(config)
     # Probe actual writes; access() is unreliable on network filesystems.
-    with tempfile.TemporaryFile(dir=destination):
-        pass
+    # SMB servers may refuse unlinking an open file (TemporaryFile does this).
+    descriptor, name = tempfile.mkstemp(prefix='.tubebox-probe-', dir=destination)
+    try:
+        with os.fdopen(descriptor, 'wb') as handle:
+            handle.write(b'TubeBox write check\n')
+            handle.flush()
+            os.fsync(handle.fileno())
+    finally:
+        Path(name).unlink()
     parser = configparser.ConfigParser(interpolation=None)
     parser['library'] = config
     path.parent.mkdir(parents=True, exist_ok=True)

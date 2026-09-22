@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 
-from .storage import TubeBoxError, enclosing_mount, install_normalized, file_identity
+from .storage import TubeBoxError, enclosing_mount, install_normalized, file_identity, known_local_mount
 
 VIDEO_EXTENSIONS = {'.mkv', '.mp4', '.m4v', '.mov', '.avi', '.webm', '.mpg', '.mpeg', '.ts', '.m2ts', '.mts', '.wmv', '.flv', '.ogv', '.vob', '.3gp'}
 COPY_SUBTITLES = {'subrip', 'ass', 'ssa', 'webvtt', 'dvd_subtitle', 'dvb_subtitle', 'hdmv_pgs_subtitle'}
@@ -211,7 +211,8 @@ def normalize_file(source, dry_run=False, verbose=False):
     temp_root = Path(tempfile.gettempdir()).resolve()
     source_mount = enclosing_mount(source)
     if (temp_root.is_relative_to(source.parent) or
-            (source_mount != Path(source_mount.anchor) and enclosing_mount(temp_root) == source_mount)):
+            (source_mount != Path(source_mount.anchor) and enclosing_mount(temp_root) == source_mount
+             and not known_local_mount(source_mount))):
         raise TubeBoxError('Temporary storage must be local and separate from the media folder. Set TMPDIR to a local directory.')
     with tempfile.TemporaryDirectory(prefix='tubebox-normalize-', dir=temp_root) as directory:
         work = Path(directory)

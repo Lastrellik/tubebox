@@ -41,6 +41,14 @@ class LibraryTests(unittest.TestCase):
             storage.check_destination(self.config)
         self.assertFalse(self.library.exists())
 
+    def test_init_write_failure_cleans_probe_and_preserves_config(self):
+        previous = self.config_path.read_bytes()
+        with patch.object(storage.os, 'fsync', side_effect=OSError('share write failed')):
+            with self.assertRaisesRegex(OSError, 'share write failed'):
+                storage.initialize(self.config_path, self.library, local=True, preferred_resolution='720')
+        self.assertEqual(self.config_path.read_bytes(), previous)
+        self.assertEqual(list(self.library.iterdir()), [self.library / '.tubebox-library'])
+
     def test_resolution_update_preserves_destination_and_local_mode(self):
         with patch.object(cli.sys.stdin, 'isatty', return_value=False), redirect_stdout(io.StringIO()):
             self.assertEqual(cli.main(['--config', str(self.config_path), 'init', '--resolution', '720p']), 0)
