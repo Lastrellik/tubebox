@@ -364,6 +364,78 @@ output. Names are sanitized for common SMB and Windows restrictions.
 
 `list` and `sync` are future possibilities, not implemented commands.
 
+## Normalize Existing Media for Raspberry Pi 3
+
+Inspect and convert an existing file or recursively process a directory:
+
+```bash
+tubebox normalize movie.mkv
+tubebox normalize /Volumes/MyDrive/Kids/Movies --dry-run
+tubebox normalize /Volumes/MyDrive/Kids
+```
+
+This command needs only `ffmpeg` (with libx264) and `ffprobe`; it does not
+require `tubebox init`, yt-dlp, or a configured download destination.
+It processes files sequentially and reports compatible, normalized, and
+failed counts. A failed file does not stop the remaining files. Any failures
+produce a nonzero command exit status. Symlinked files/directories and hidden
+transfer files are excluded from recursive discovery.
+
+The Pi 3 house format is **H.264/AVC, 8-bit yuv420p, no wider than 1920 pixels
+and no taller than 1080 pixels**. If the primary video stream already meets
+that target, the file is left untouched, regardless of container. Otherwise,
+TubeBox explains the incompatibility and encodes with `libx264`,
+`-preset medium`, `-crf 20`, and `-pix_fmt yuv420p` into MKV. It preserves
+frame timing without forcing a new frame rate, retains display aspect ratio,
+and scales down only as needed (rounding dimensions down to even pixels).
+It does not upscale or perform HDR-to-SDR tone mapping.
+
+All audio streams are copied without re-encoding. Supported subtitle streams
+(SRT, ASS/SSA, WebVTT, DVD, DVB, and PGS) are copied; MP4 `mov_text` captions
+are converted to SRT, which preserves text but can lose styling. Subtitles
+are never burned in. Chapters, attachments, language tags, and useful metadata
+are carried over. Unsupported subtitle/data streams or extra video/cover
+streams are reported, and the source is retained alongside a
+`Movie.normalized.mkv` output rather than discarded. A one-second local
+encoding/muxing check detects common stream/container problems before the
+full encode; unsupported audio muxing fails safely without re-encoding it.
+
+The normal replacement flow is:
+
+1. Inspect the source with ffprobe, using a local working directory.
+2. Copy incompatible input to a local temporary workspace and encode there.
+3. Probe the finished result: check codec, pixel format, dimensions, duration,
+   frame rate, aspect ratio, audio/subtitle tracks, attachments, and chapters.
+4. Copy the validated file to a temporary sibling at the destination,
+   flush it, and verify its size and SHA-256 checksum.
+5. Recheck that the source has not changed, then rename the copy into place.
+
+`Movie.mkv` keeps its filename. Other containers become `Movie.mkv`; the
+old file is removed only after installation succeeds. Existing unrelated
+output files cause a safe failure. Folder artwork and sidecar files are
+untouched. A folder lock prevents simultaneous TubeBox normalizers from
+replacing files in the same directory. Avoid editing or moving files with
+other programs while normalization runs.
+
+Network storage remains **final storage only**. Neither ffmpeg nor its
+intermediates run on SMB, and ffprobe runs with a local working directory.
+Local temporary storage needs room for the source copy plus encoded output.
+Working files are cleaned up on success, ordinary failures, and Ctrl-C.
+
+Encoding, validation, or copy failures preserve the original. Same-directory
+replacement uses filesystem rename semantics; TubeBox never falls back to
+copying over the original. If a rename fails or its result cannot be confirmed
+(for example, a dropped SMB connection), TubeBox reports the relevant paths
+and retains the verified copy where possible for recovery. Inspect both files
+before retrying. A hard kill or power loss can leave a local workspace,
+`.tubebox-normalize-lock`, or a `.tubebox-normalized-*.mkv` transfer/recovery file;
+check that no normalizer is running before cleaning these up.
+
+`--dry-run` probes everything and reports proposed outputs without copying
+sources, encoding, or changing media. During conversion, progress includes
+percentage, encoded time, speed, and ETA when ffmpeg provides them. Use
+`--verbose` to show raw ffmpeg diagnostics.
+
 ## Development and Tests
 
 If both download attempts fail with `HTTP Error 403: Forbidden`, the source
@@ -396,6 +468,13 @@ using synthetic metadata, without network access or media downloads; otherwise
 those tests are skipped. They do not replace
 an end-to-end check with your actual mounted share and a video you own
 or are permitted to download.
+
+Normalization tests cover compatibility, stream preservation, dry runs,
+source safety, and transfer failures. When ffmpeg/ffprobe are installed,
+additional tests generate tiny synthetic videos locally to verify real
+10-bit conversion, downscaling, fractional frame rates, multiple audio and
+subtitle tracks, chapters, metadata, and `mov_text` conversion. These temporary
+fixtures are deleted after each test and are never shipped with TubeBox.
 
 ## Kodi
 

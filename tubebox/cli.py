@@ -270,6 +270,10 @@ def main(argv=None):
     download.add_argument('--season', type=number)
     download.add_argument('--episode', type=number)
     download.add_argument('-y', '--yes', action='store_true', help='Accept defaults without prompts')
+    normalizer = commands.add_parser('normalize', help='Normalize existing videos for Pi 3 playback')
+    normalizer.add_argument('path', type=Path, help='Video file or directory to scan recursively')
+    normalizer.add_argument('--dry-run', action='store_true', help='Inspect and report without modifying media')
+    normalizer.add_argument('--verbose', action='store_true', help='Show ffmpeg diagnostic output')
     args = parser.parse_args(argv)
     try:
         if args.command == 'init':
@@ -292,6 +296,9 @@ def main(argv=None):
             config = initialize(args.config, destination, local, preference)
             display_resolution = str(1080 if preference == 'best' else min(int(preference), 1080)) + 'p'
             print(f'Saved configuration: {args.config}\nLibrary: {config["destination"]}\nResolution: {display_resolution}')
+        elif args.command == 'normalize':
+            from .normalize import normalize
+            return normalize(args)
         else:
             add(args)
     except (TubeBoxError, OSError, configparser.Error, argparse.ArgumentTypeError) as exc:
