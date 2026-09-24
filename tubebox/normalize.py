@@ -254,7 +254,8 @@ def discover(path):
     return files
 
 
-def normalize_file(source, dry_run=False, verbose=False, encoder='auto', fps=30):
+def normalize_file(source, dry_run=False, verbose=False, encoder='auto', fps=30, local=False):
+    source = source.absolute()
     temp_root = Path(tempfile.gettempdir()).resolve()
     source_mount = enclosing_mount(source)
     if (temp_root.is_relative_to(source.parent) or
@@ -286,13 +287,19 @@ def normalize_file(source, dry_run=False, verbose=False, encoder='auto', fps=30)
         total = duration(info)
         print(f'      -> {target}' + (' (original retained)' if warnings else ' (replaces original)'))
         if dry_run:
+            if local:
+                print('      Local mode: read source directly; no input copy')
             print(f'      Encoder: {encoder}' + (' (NVIDIA availability checked when encoding; CPU fallback)' if encoder == 'auto' else ''))
             return 'would normalize'
-        print('      Copying source to local workspace...', flush=True)
-        local_source = work / ('source' + source.suffix)
-        shutil.copyfile(source, local_source)
-        if file_identity(source) != identity or local_source.stat().st_size != identity[2]:
-            raise TubeBoxError('Source changed during copying; original preserved.')
+        if local:
+            print('      Reading local source directly (no input copy)...', flush=True)
+            local_source = source
+        else:
+            print('      Copying source to local workspace...', flush=True)
+            local_source = work / ('source' + source.suffix)
+            shutil.copyfile(source, local_source)
+            if file_identity(source) != identity or local_source.stat().st_size != identity[2]:
+                raise TubeBoxError('Source changed during copying; original preserved.')
         selected = select_encoder(local_source, info, work, total, encoder, verbose, fps=fps)
         output = work / 'normalized.mkv'
         print(f'      Encoding with {"NVIDIA GPU (h264_nvenc)" if selected == "nvenc" else "CPU (libx264)"}...', flush=True)
@@ -323,7 +330,7 @@ def normalize(args):
     for index, source in enumerate(files, 1):
         print(f'\n[{index}/{len(files)}] {source}', flush=True)
         try:
-            result = normalize_file(source, args.dry_run, args.verbose, args.encoder, fps=fps)
+            result = normalize_file(source, args.dry_run, args.verbose, args.encoder, fps=fps, local=args.local)
             if result == 'would normalize':
                 planned += 1
             else:

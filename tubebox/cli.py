@@ -287,6 +287,8 @@ def main(argv=None):
     normalizer.add_argument('--dry-run', action='store_true', help='Inspect and report without modifying media')
     normalizer.add_argument('--verbose', action='store_true', help='Show ffmpeg diagnostic output')
     normalizer.add_argument('--fps', type=int, choices=(30, 60), help='Override the saved frame rate cap for this run')
+    normalizer.add_argument('--local', action='store_true',
+                            help='Read a local source directly without copying it to the temporary workspace')
     normalizer.add_argument('--encoder', choices=('auto', 'nvenc', 'cpu'), default='auto',
                             help='Video encoder: auto tries NVIDIA then CPU; nvenc requires NVIDIA; cpu uses libx264')
     args = parser.parse_args(argv)

@@ -62,7 +62,10 @@ rename on the destination filesystem; never encode directly onto SMB.
 - Copy every supported audio/subtitle stream, chapters, attachments, and
   useful metadata. Report unsupported streams before a long encode and
   retain the original when a stream cannot be preserved.
-- Stage source and encoding locally. Validate completed output with
+- Stage source and encoding locally by default. `normalize --local` may
+  read the source directly, skipping the input copy for local media;
+  encoding still writes a separate local temporary output.
+  Validate completed output with
   ffprobe, including compatibility, duration, and preserved streams.
 - Verify the final destination copy before replacing any original.
   Detect changed sources and never overwrite unrelated files. If rename

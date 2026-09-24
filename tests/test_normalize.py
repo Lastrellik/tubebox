@@ -127,9 +127,58 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(input_path.read_bytes(), self.original)
         Path(command[-1]).write_bytes(b'normalized-media')
 
-    def run_file(self, dry=False, encoder=None, probe_info=None, mode='auto'):
+    def run_file(self, dry=False, encoder=None, probe_info=None, mode='auto', local=False):
         with patch.object(n, 'probe', side_effect=probe_info or [self.input, self.output]), patch.object(n, 'encode', side_effect=encoder or self.fake_encode), redirect_stdout(io.StringIO()):
-            return n.normalize_file(self.source, dry_run=dry, encoder=mode)
+            return n.normalize_file(self.source, dry_run=dry, encoder=mode, local=local)
+
+    def direct_encode(self, command, work, *args, **kwargs):
+        self.workspaces.append(work)
+        self.assertEqual(Path(command[command.index('-i') + 1]), self.source)
+        self.assertEqual(self.source.read_bytes(), self.original)
+        output = Path(command[-1])
+        self.assertEqual(output.parent, work)
+        self.assertNotEqual(output, self.source)
+        output.write_bytes(b'normalized-media')
+
+    def test_local_reads_source_directly_and_safely_replaces_it(self):
+        with patch.object(n.shutil, 'copyfile', side_effect=AssertionError('Input must not be copied')):
+            self.assertEqual(self.run_file(local=True, encoder=self.direct_encode), 'normalized')
+        self.assertEqual(self.source.read_bytes(), b'normalized-media')
+        self.assertTrue(all(not work.exists() for work in self.workspaces))
+
+    def test_local_failure_preserves_original(self):
+        def fail(command, work, *args, **kwargs):
+            self.direct_encode(command, work)
+            raise storage.TubeBoxError('encode failed')
+        with self.assertRaisesRegex(storage.TubeBoxError, 'encode failed'):
+            self.run_file(local=True, mode='cpu', encoder=fail)
+        self.assertEqual(self.source.read_bytes(), self.original)
+        self.assertTrue(all(not work.exists() for work in self.workspaces))
+
+    def test_local_changed_source_is_not_replaced(self):
+        def change(command, work, *args, **kwargs):
+            self.direct_encode(command, work)
+            if '-t' not in command:
+                self.source.write_bytes(b'changed-by-user')
+        with self.assertRaisesRegex(storage.TubeBoxError, 'Source changed'):
+            self.run_file(local=True, encoder=change)
+        self.assertEqual(self.source.read_bytes(), b'changed-by-user')
+
+    def test_local_dry_run_does_not_copy_or_encode(self):
+        with patch.object(n.shutil, 'copyfile', side_effect=AssertionError('Unexpected copy')):
+            self.assertEqual(self.run_file(local=True, dry=True,
+                             encoder=lambda *a, **kw: self.fail('Unexpected encode')), 'would normalize')
+        self.assertEqual(self.source.read_bytes(), self.original)
+
+    def test_cli_passes_local_flag_to_nested_files(self):
+        nested = self.root / 'nested'
+        nested.mkdir()
+        (nested / 'Other.mkv').write_bytes(self.original)
+        with patch.object(n, 'normalize_file', return_value='compatible') as run, redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(['normalize', str(self.root), '--local', '--fps', '60']), 0)
+        self.assertEqual(run.call_count, 2)
+        self.assertTrue(all(call.kwargs['local'] is True and call.kwargs['fps'] == 60
+                            for call in run.call_args_list))
 
     def test_auto_uses_nvenc_after_successful_preview(self):
         calls = []
@@ -334,7 +383,7 @@ class WorkflowTests(unittest.TestCase):
     def test_directory_continues_after_failure(self):
         other = self.root / 'second.mkv'
         other.write_bytes(b'video')
-        args = argparse.Namespace(path=self.root, dry_run=False, verbose=False, encoder='auto')
+        args = argparse.Namespace(path=self.root, dry_run=False, verbose=False, encoder='auto', local=False)
         with patch.object(n.shutil, 'which', return_value='/tool'), patch.object(n, 'normalize_file', side_effect=[storage.TubeBoxError('bad'), 'compatible']) as run, redirect_stdout(io.StringIO()) as output, redirect_stderr(io.StringIO()):
             self.assertEqual(n.normalize(args), 1)
             self.assertEqual(run.call_count, 2)

@@ -365,6 +365,20 @@ failed counts. A failed file does not stop the remaining files. Any failures
 produce a nonzero command exit status. Symlinked files/directories and hidden
 transfer files are excluded from recursive discovery.
 
+For files already on your computer, skip the initial source copy:
+
+```bash
+tubebox normalize ~/Downloads/Movies --local
+```
+
+`--local` reads each source directly, including files in nested folders. It
+does not overwrite a video while reading it: encoding still produces a
+separate temporary output, which is validated and safely transferred back
+before replacing the original. The completed-output copy still happens.
+Use the default mode for files on the Pi so encoding reads a local staged
+copy instead of depending on SMB throughout the encode. GPU selection,
+dry runs, and changed-source detection work in both modes.
+
 The compatibility target is **H.264/AVC, 8-bit yuv420p, no wider than 1920 pixels
 and no taller than 1080 pixels**, within the saved frame rate cap. If the primary video stream already meets
 that target, the file is left untouched, regardless of container. Otherwise,
@@ -413,7 +427,8 @@ full encode; unsupported audio muxing fails safely without re-encoding it.
 The normal replacement flow is:
 
 1. Inspect the source with ffprobe, using a local working directory.
-2. Copy incompatible input to a local temporary workspace and encode there.
+2. Copy incompatible input to a local temporary workspace (or read the
+   source directly with `--local`) and encode into a separate local output.
 3. Probe the finished result: check codec, pixel format, dimensions, duration,
    frame rate, aspect ratio, audio/subtitle tracks, attachments, and chapters.
 4. Copy the validated file to a temporary sibling at the destination,

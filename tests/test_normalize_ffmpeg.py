@@ -18,6 +18,12 @@ class FFmpegNormalizationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_real_60fps_cap_preserves_duration_audio_and_lower_rates(self):
+        self.check_fps_cap(local=False)
+
+    def test_real_local_60fps_cap_preserves_duration_and_audio(self):
+        self.check_fps_cap(local=True)
+
+    def check_fps_cap(self, local):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / 'High fps.mkv'
@@ -37,7 +43,7 @@ class FFmpegNormalizationTests(unittest.TestCase):
                 self.assertEqual(n.normalize_file(source, fps=60), 'compatible')
                 self.assertEqual(n.normalize_file(source, fps=30, dry_run=True), 'would normalize')
                 self.assertEqual(source.read_bytes(), before)
-                self.assertEqual(n.normalize_file(source, encoder='cpu', fps=30), 'normalized')
+                self.assertEqual(n.normalize_file(source, encoder='cpu', fps=30, local=local), 'normalized')
             result = n.probe(source, root)
             self.assertEqual(n.primary_video(result)['avg_frame_rate'], '30/1')
             self.assertLess(abs(n.duration(original) - n.duration(result)), 0.05)
@@ -51,11 +57,14 @@ class FFmpegNormalizationTests(unittest.TestCase):
     def test_real_multistream_10bit_frame_rate_chapters_and_metadata(self):
         self.check_multistream('cpu')
 
+    def test_real_local_multistream_preservation(self):
+        self.check_multistream('cpu', local=True)
+
     @unittest.skipUnless(os.environ.get('TUBEBOX_TEST_NVENC') == '1', 'Set TUBEBOX_TEST_NVENC=1 to test a real NVIDIA GPU')
     def test_real_nvenc_multistream_10bit_frame_rate_chapters_and_metadata(self):
         self.check_multistream('nvenc')
 
-    def check_multistream(self, encoder):
+    def check_multistream(self, encoder, local=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / 'Movie.mkv'
@@ -74,7 +83,7 @@ class FFmpegNormalizationTests(unittest.TestCase):
                              '-t', '1.2', str(source)])
             original = n.probe(source, root)
             with redirect_stdout(io.StringIO()):
-                self.assertEqual(n.normalize_file(source, encoder=encoder), 'normalized')
+                self.assertEqual(n.normalize_file(source, encoder=encoder, local=local), 'normalized')
             result = n.probe(source, root)
             n.validate_output(original, result)
             video = n.primary_video(result)
