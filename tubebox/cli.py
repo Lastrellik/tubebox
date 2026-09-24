@@ -12,24 +12,24 @@ import tempfile
 import unicodedata
 from urllib.parse import urlparse
 
-from .storage import TubeBoxError, check_destination, config_path, initialize, load_config, resolution
+from .storage import TubeBoxError, check_destination, config_path, initialize, load_config, resolution, fps_limit
 
 
-def download_format(preference):
+def download_format(preference, fps=30):
     preference = resolution(preference)
     ceiling = 1080 if preference == 'best' else min(int(preference), 1080)
-    limit = f'[height<={ceiling}]'
+    limit = f'[height<={ceiling}][fps<={fps_limit(fps)}]'
     return f'bv*{limit}+ba/b{limit}'
 
 
-def download_media(url, stage, preference):
+def download_media(url, stage, preference, fps=30):
     for attempt in range(2):
         work = stage / f'attempt-{attempt + 1}'
         work.mkdir()
         options = ['--check-formats', '--format-sort', 'res,vcodec:h264,acodec:aac'] if attempt == 0 else []
         try:
             run(['yt-dlp', '--ignore-config', '--no-cache-dir', '--no-playlist', '--no-overwrites',
-                 '--socket-timeout', '20', '--format', download_format(preference), *options,
+                 '--socket-timeout', '20', '--format', download_format(preference, fps), *options,
                  '--merge-output-format', 'mkv', '--write-thumbnail', '--convert-thumbnails', 'jpg',
                  '--output', 'video.%(ext)s', '--paths', str(work), '--paths', f'temp:{work}',
                  '--', url], cwd=work)
@@ -189,6 +189,7 @@ def folder_art(info, stage, thumb):
 
 def add(args):
     config = load_config(args.config)
+    fps = fps_limit(getattr(args, 'fps', None) or config['fps'])
     destination = check_destination(config)
     dependencies()
     if urlparse(args.url).scheme not in ('http', 'https'):
@@ -226,7 +227,7 @@ def add(args):
         if folder.exists():
             ensure_free(folder, stem)
         print(f'Downloading: {stem}')
-        video, thumb = download_media(args.url, stage, config['resolution'])
+        video, thumb = download_media(args.url, stage, config['resolution'], fps)
         poster = None if (folder / 'poster.jpg').exists() else folder_art(info, stage, thumb)
         if poster is not None and (not poster.is_file() or not poster.stat().st_size):
             raise TubeBoxError('Folder artwork is empty or missing; nothing was added.')
@@ -272,10 +273,12 @@ def main(argv=None):
     init.add_argument('--local', action='store_true', default=None, help='Explicitly allow local storage instead of a mounted share')
     init.add_argument('--resolution', type=resolution_argument,
                       help='Maximum video height, e.g. 720p or 1080p (all downloads capped at 1080p)')
+    init.add_argument('--fps', type=int, choices=(30, 60), help='Save a frame rate cap (default: 30)')
     download = commands.add_parser('add', help='Download one permitted video with artwork')
     download.add_argument('url')
     download.add_argument('--folder', help='Override the creator folder')
     download.add_argument('--name', help='Override the video title')
+    download.add_argument('--fps', type=int, choices=(30, 60), help='Override the saved frame rate cap for this download')
     download.add_argument('--season', type=number)
     download.add_argument('--episode', type=number)
     download.add_argument('-y', '--yes', action='store_true', help='Accept defaults without prompts')
@@ -283,6 +286,7 @@ def main(argv=None):
     normalizer.add_argument('path', type=Path, help='Video file or directory to scan recursively')
     normalizer.add_argument('--dry-run', action='store_true', help='Inspect and report without modifying media')
     normalizer.add_argument('--verbose', action='store_true', help='Show ffmpeg diagnostic output')
+    normalizer.add_argument('--fps', type=int, choices=(30, 60), help='Override the saved frame rate cap for this run')
     normalizer.add_argument('--encoder', choices=('auto', 'nvenc', 'cpu'), default='auto',
                             help='Video encoder: auto tries NVIDIA then CPU; nvenc requires NVIDIA; cpu uses libx264')
     args = parser.parse_args(argv)
@@ -302,11 +306,14 @@ def main(argv=None):
             preference = args.resolution or existing.get('resolution', '1080')
             if args.resolution is None and sys.stdin.isatty():
                 preference = resolution(ask('Maximum resolution (up to 1080p)', preference))
+            fps = args.fps or fps_limit(existing.get('fps', '30'))
+            if args.fps is None and sys.stdin.isatty():
+                fps = fps_limit(ask('Maximum frame rate (30 or 60 fps)', str(fps)))
             same_destination = bool(existing) and destination.expanduser().resolve() == Path(existing['destination'])
             local = args.local if args.local is not None else same_destination and existing.get('storage') == 'local'
-            config = initialize(args.config, destination, local, preference)
+            config = initialize(args.config, destination, local, preference, fps)
             display_resolution = str(1080 if preference == 'best' else min(int(preference), 1080)) + 'p'
-            print(f'Saved configuration: {args.config}\nLibrary: {config["destination"]}\nResolution: {display_resolution}')
+            print(f'Saved configuration: {args.config}\nLibrary: {config["destination"]}\nResolution: {display_resolution}\nFrame rate cap: {fps} fps')
         elif args.command == 'normalize':
             from .normalize import normalize
             return normalize(args)

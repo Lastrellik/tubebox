@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 
-from .storage import TubeBoxError, enclosing_mount, install_normalized, file_identity, known_local_mount
+from .storage import TubeBoxError, enclosing_mount, install_normalized, file_identity, known_local_mount, load_config, fps_limit
 
 VIDEO_EXTENSIONS = {'.mkv', '.mp4', '.m4v', '.mov', '.avi', '.webm', '.mpg', '.mpeg', '.ts', '.m2ts', '.mts', '.wmv', '.flv', '.ogv', '.vob', '.3gp'}
 COPY_SUBTITLES = {'subrip', 'ass', 'ssa', 'webvtt', 'dvd_subtitle', 'dvb_subtitle', 'hdmv_pgs_subtitle'}
@@ -43,7 +43,16 @@ def primary_video(info):
     return next((s for s in videos if s.get('disposition', {}).get('default')), videos[0])
 
 
-def reasons(stream):
+def frame_rate(stream):
+    # r_frame_rate may describe a container time base, especially for short clips.
+    for key in ('avg_frame_rate', 'r_frame_rate'):
+        rate = ratio(stream.get(key))
+        if math.isfinite(rate) and rate > 0:
+            return rate
+    raise TubeBoxError('Cannot determine video frame rate safely; original will be preserved.')
+
+
+def reasons(stream, fps=30):
     result = []
     if stream.get('codec_name') != 'h264':
         result.append(stream.get('codec_name', 'unknown codec').upper())
@@ -54,6 +63,9 @@ def reasons(stream):
         raise TubeBoxError('Video dimensions are missing.')
     if width > 1920 or height > 1080:
         result.append(f'{width}x{height} exceeds 1920x1080')
+    rate = frame_rate(stream)
+    if rate > fps_limit(fps):
+        result.append(f'{rate:.3f} fps exceeds {fps} fps')
     return result
 
 
@@ -92,7 +104,7 @@ def stream_plan(info):
     return maps, conversions, subtitle_codecs, warnings
 
 
-def encode_command(source, output, info, preview=False, encoder='cpu'):
+def encode_command(source, output, info, preview=False, encoder='cpu', fps=30):
     maps, conversions, _, _ = stream_plan(info)
     if encoder == 'nvenc':
         video_options = ['-c:v', 'h264_nvenc', '-preset', 'p5', '-tune', 'hq',
@@ -101,16 +113,19 @@ def encode_command(source, output, info, preview=False, encoder='cpu'):
         video_options = ['-c:v', 'libx264', '-preset', 'medium', '-crf', '20']
     else:
         raise TubeBoxError(f'Unknown encoder: {encoder}')
+    filters = SCALE
+    if frame_rate(primary_video(info)) > fps_limit(fps):
+        filters += f',fps=fps={fps_limit(fps)}'
     command = ['ffmpeg', '-nostdin', '-hide_banner', '-xerror', '-noautorotate', '-i', str(source),
                *maps, '-map_metadata', '0', '-map_chapters', '0', '-c', 'copy',
                *video_options, '-pix_fmt', 'yuv420p',
-               '-vf', SCALE, '-fps_mode:v', 'passthrough', '-c:a', 'copy', '-c:s', 'copy', *conversions]
+               '-vf', filters, '-fps_mode:v', 'passthrough', '-c:a', 'copy', '-c:s', 'copy', *conversions]
     if preview:
         command += ['-t', '1']
     return command + ['-f', 'matroska', '-n', str(output)]
 
 
-def select_encoder(source, info, work, total, requested, verbose=False):
+def select_encoder(source, info, work, total, requested, verbose=False, fps=30):
     """Test the actual input and stream mappings, not just advertised encoders."""
     if requested not in ('auto', 'cpu', 'nvenc'):
         raise TubeBoxError(f'Unknown encoder: {requested}')
@@ -119,7 +134,7 @@ def select_encoder(source, info, work, total, requested, verbose=False):
     for candidate in candidates:
         print(f'      Checking {candidate} encoder and stream/container compatibility...', flush=True)
         try:
-            encode(encode_command(source, preview, info, preview=True, encoder=candidate),
+            encode(encode_command(source, preview, info, preview=True, encoder=candidate, fps=fps),
                    work, total, verbose, progress=False)
             return candidate
         except TubeBoxError as exc:
@@ -189,18 +204,19 @@ def ratio(value):
         return 0
 
 
-def validate_output(source, output):
+def validate_output(source, output, fps=30):
     original, video = primary_video(source), primary_video(output)
-    if reasons(video):
-        raise TubeBoxError('Output did not meet the H.264 / yuv420p / 1080p target.')
+    if reasons(video, fps):
+        raise TubeBoxError('Output did not meet the H.264 / yuv420p / 1080p / frame rate target.')
     before, after = duration(source), duration(output)
     if abs(before - after) > max(2, before * 0.01):
         raise TubeBoxError('Output duration differs from the source; refusing replacement.')
     if video['width'] > original['width'] or video['height'] > original['height']:
         raise TubeBoxError('Output was upscaled; refusing replacement.')
-    src_rate, dst_rate = ratio(original.get('avg_frame_rate')), ratio(video.get('avg_frame_rate'))
-    if src_rate and dst_rate and abs(src_rate - dst_rate) > max(0.1, src_rate * 0.01):
-        raise TubeBoxError('Output frame rate differs from the source; refusing replacement.')
+    src_rate, dst_rate = frame_rate(original), frame_rate(video)
+    expected_rate = min(src_rate, fps_limit(fps))
+    if abs(expected_rate - dst_rate) > max(0.1, expected_rate * 0.01):
+        raise TubeBoxError('Output frame rate differs from the expected rate; refusing replacement.')
     src_aspect = original['width'] / original['height'] * (ratio(original.get('sample_aspect_ratio')) or 1)
     dst_aspect = video['width'] / video['height'] * (ratio(video.get('sample_aspect_ratio')) or 1)
     if abs(src_aspect - dst_aspect) > src_aspect * 0.01:
@@ -238,7 +254,7 @@ def discover(path):
     return files
 
 
-def normalize_file(source, dry_run=False, verbose=False, encoder='auto'):
+def normalize_file(source, dry_run=False, verbose=False, encoder='auto', fps=30):
     temp_root = Path(tempfile.gettempdir()).resolve()
     source_mount = enclosing_mount(source)
     if (temp_root.is_relative_to(source.parent) or
@@ -250,12 +266,14 @@ def normalize_file(source, dry_run=False, verbose=False, encoder='auto'):
         identity = file_identity(source)
         info = probe(source, work)
         video = primary_video(info)
-        why = reasons(video)
+        why = reasons(video, fps)
         print(f'      {video.get("codec_name", "unknown").upper()} / {video.get("pix_fmt", "unknown")} / {video["width"]}x{video["height"]}')
         if not why:
             print('      Already Pi 3 compatible; skipped')
             return 'compatible'
         print('      Requires normalization: ' + ', '.join(why))
+        if frame_rate(video) > fps_limit(fps):
+            print(f'      Reducing video to {fps} fps; playback speed and audio are preserved.')
         _, conversions, _, warnings = stream_plan(info)
         for message in warnings:
             print('      ' + message)
@@ -275,14 +293,14 @@ def normalize_file(source, dry_run=False, verbose=False, encoder='auto'):
         shutil.copyfile(source, local_source)
         if file_identity(source) != identity or local_source.stat().st_size != identity[2]:
             raise TubeBoxError('Source changed during copying; original preserved.')
-        selected = select_encoder(local_source, info, work, total, encoder, verbose)
+        selected = select_encoder(local_source, info, work, total, encoder, verbose, fps=fps)
         output = work / 'normalized.mkv'
         print(f'      Encoding with {"NVIDIA GPU (h264_nvenc)" if selected == "nvenc" else "CPU (libx264)"}...', flush=True)
-        encode(encode_command(local_source, output, info, encoder=selected), work, total, verbose)
+        encode(encode_command(local_source, output, info, encoder=selected, fps=fps), work, total, verbose)
         if not output.is_file() or not output.stat().st_size:
             raise TubeBoxError('ffmpeg produced no output; original preserved.')
         print('      Validating...', flush=True)
-        validate_output(info, probe(output, work))
+        validate_output(info, probe(output, work), fps)
         print('      Transferring validated output...', flush=True)
         message = install_normalized(output, source, target, identity, keep_source=bool(warnings))
         print('      ' + message)
@@ -293,6 +311,10 @@ def normalize(args):
     missing = [tool for tool in ('ffmpeg', 'ffprobe') if not shutil.which(tool)]
     if missing:
         raise TubeBoxError('Missing dependencies: ' + ', '.join(missing) + '. Install ffmpeg (which includes ffprobe).')
+    config_file = getattr(args, 'config', None)
+    config = load_config(config_file) if config_file is not None and config_file.exists() else {}
+    fps = fps_limit(getattr(args, 'fps', None) or config.get('fps', '30'))
+    print(f'Frame rate cap: {fps} fps')
     path = args.path.expanduser().absolute()
     files = discover(path)
     print(f'Scanning {len(files)} videos...' + (' (dry run)' if args.dry_run else ''))
@@ -301,7 +323,7 @@ def normalize(args):
     for index, source in enumerate(files, 1):
         print(f'\n[{index}/{len(files)}] {source}', flush=True)
         try:
-            result = normalize_file(source, args.dry_run, args.verbose, args.encoder)
+            result = normalize_file(source, args.dry_run, args.verbose, args.encoder, fps=fps)
             if result == 'would normalize':
                 planned += 1
             else:

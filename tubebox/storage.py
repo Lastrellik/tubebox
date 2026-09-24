@@ -92,6 +92,13 @@ def resolution(value):
     return value.removesuffix('p')
 
 
+def fps_limit(value):
+    value = str(value).strip()
+    if value not in ('30', '60'):
+        raise TubeBoxError('Frame rate cap must be 30 or 60 fps.')
+    return int(value)
+
+
 def config_path():
     return Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'tubebox' / 'config.ini'
 
@@ -147,13 +154,15 @@ def load_config(path):
             raise ValueError('storage must be network or local')
         # Accept older configurations; the downloader enforces its 1080p ceiling.
         config['resolution'] = resolution(config.get('resolution', 'best'))
+        config['fps'] = str(fps_limit(config.get('fps', '30')))
     except (KeyError, ValueError) as exc:
         raise TubeBoxError(f'Invalid configuration: {exc}. Run tubebox init again.') from exc
     return config
 
 
-def initialize(path, destination, local=False, preferred_resolution='1080'):
+def initialize(path, destination, local=False, preferred_resolution='1080', fps=30):
     preferred_resolution = resolution(preferred_resolution)
+    fps = fps_limit(fps)
     destination = destination.expanduser().resolve()
     # Never create a missing destination: it may be an unmounted share.
     if not destination.is_dir():
@@ -171,7 +180,7 @@ def initialize(path, destination, local=False, preferred_resolution='1080'):
     if not library_id:
         raise TubeBoxError(f'Empty library marker: {marker}')
     config = dict(destination=str(destination), storage='local' if local else 'network',
-                  mount=str(mount), library_id=library_id, resolution=preferred_resolution)
+                  mount=str(mount), library_id=library_id, resolution=preferred_resolution, fps=str(fps))
     check_destination(config)
     # Probe actual writes; access() is unreliable on network filesystems.
     # SMB servers may refuse unlinking an open file (TemporaryFile does this).

@@ -11,7 +11,7 @@ from tubebox.cli import download_format
 
 @unittest.skipUnless(shutil.which('yt-dlp'), 'Optional format integration checks require yt-dlp')
 class FormatTests(unittest.TestCase):
-    def select(self, preference, formats, permissive=False):
+    def select(self, preference, formats, permissive=False, fps=30):
         with tempfile.TemporaryDirectory() as directory:
             info = Path(directory) / 'info.json'
             info.write_text(json.dumps({'id': 'test', 'title': 'Synthetic formats',
@@ -19,14 +19,27 @@ class FormatTests(unittest.TestCase):
                                        'formats': formats}))
             return subprocess.run([
                 'yt-dlp', '--ignore-config', '--simulate', '--no-check-formats',
-                '--load-info-json', str(info), '--format', download_format(preference),
+                '--load-info-json', str(info), '--format', download_format(preference, fps),
                 *([] if permissive else ['--format-sort', 'res,vcodec:h264,acodec:aac']), '--print', 'format_id',
             ], capture_output=True, text=True, timeout=20)
 
     def video(self, height, ext='mp4', audio=True):
         return dict(format_id=f'{height}-{ext}', height=height, width=height * 16 // 9 if height else None,
-                    ext=ext, vcodec='h264', acodec='aac' if audio else 'none',
+                    ext=ext, fps=30, vcodec='h264', acodec='aac' if audio else 'none',
                     url='https://example.org/synthetic.' + ext)
+
+    def test_frame_rate_cap_applies_to_both_download_attempts(self):
+        formats = [dict(self.video(1080), format_id='30fps', fps=30),
+                   dict(self.video(1080), format_id='60fps', fps=60)]
+        for permissive in (False, True):
+            for cap in (30, 60):
+                with self.subTest(cap=cap, permissive=permissive):
+                    result = self.select('1080', formats, permissive=permissive, fps=cap)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout.strip(), f'{cap}fps')
+        for rate in (60, None):
+            result = self.select('1080', [dict(self.video(1080), fps=rate)])
+            self.assertNotEqual(result.returncode, 0)
 
     def test_resolution_cap_and_lower_fallback(self):
         for heights, expected in [([720, 1080, 2160], '1080-mp4'), ([480, 720, 2160], '720-mp4')]:

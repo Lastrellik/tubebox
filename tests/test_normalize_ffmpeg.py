@@ -17,6 +17,37 @@ class FFmpegNormalizationTests(unittest.TestCase):
         result = subprocess.run(['ffmpeg', '-v', 'error', '-nostdin', *args], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_real_60fps_cap_preserves_duration_audio_and_lower_rates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'High fps.mkv'
+            self.run_ffmpeg(['-f', 'lavfi', '-i', 'testsrc2=size=96x64:rate=60:duration=2',
+                             '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
+                             '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', str(source)])
+            original = n.probe(source, root)
+            def audio_packets():
+                result = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'a',
+                                         '-show_packets', '-show_data_hash', 'sha256',
+                                         '-show_entries', 'packet=pts_time,duration_time,data_hash',
+                                         '-of', 'json', str(source)], capture_output=True, text=True, check=True)
+                return result.stdout
+            packets = audio_packets()
+            before = source.read_bytes()
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(n.normalize_file(source, fps=60), 'compatible')
+                self.assertEqual(n.normalize_file(source, fps=30, dry_run=True), 'would normalize')
+                self.assertEqual(source.read_bytes(), before)
+                self.assertEqual(n.normalize_file(source, encoder='cpu', fps=30), 'normalized')
+            result = n.probe(source, root)
+            self.assertEqual(n.primary_video(result)['avg_frame_rate'], '30/1')
+            self.assertLess(abs(n.duration(original) - n.duration(result)), 0.05)
+            self.assertEqual(audio_packets(), packets)
+            n.validate_output(original, result, fps=30)
+            before = source.read_bytes()
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(n.normalize_file(source, fps=60), 'compatible')
+            self.assertEqual(source.read_bytes(), before)
+
     def test_real_multistream_10bit_frame_rate_chapters_and_metadata(self):
         self.check_multistream('cpu')
 

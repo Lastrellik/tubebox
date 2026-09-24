@@ -34,6 +34,36 @@ class LibraryTests(unittest.TestCase):
                 'title': 'Mars / Rover', 'channel': 'NASA'}), patch.object(cli, 'run', side_effect=runner or self.fake_run), redirect_stdout(io.StringIO()):
             cli.add(self.args)
 
+    def test_saved_fps_and_per_command_override(self):
+        storage.initialize(self.config_path, self.library, local=True, fps=60)
+        for override, expected in ((None, 60), (30, 30)):
+            self.args.fps = override
+            self.args.name = f'Video {expected}'
+            def check(command, **kwargs):
+                self.assertIn(f'[fps<={expected}]', command[command.index('--format') + 1])
+                self.fake_run(command)
+            self.download(check)
+        self.assertEqual(storage.load_config(self.config_path)['fps'], '60')
+
+    def test_init_prompts_for_and_preserves_fps(self):
+        with patch.object(cli.sys.stdin, 'isatty', return_value=True), \
+                patch('builtins.input', side_effect=['', '', '60']), redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(['--config', str(self.config_path), 'init']), 0)
+        self.assertEqual(storage.load_config(self.config_path)['fps'], '60')
+        with patch.object(cli.sys.stdin, 'isatty', return_value=True), \
+                patch('builtins.input', return_value=''), redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(['--config', str(self.config_path), 'init']), 0)
+        self.assertEqual(storage.load_config(self.config_path)['fps'], '60')
+
+    def test_legacy_fps_default_and_invalid_config(self):
+        original = self.config_path.read_text()
+        self.config_path.write_text(original.replace('fps = 30\n', ''))
+        self.assertEqual(storage.load_config(self.config_path)['fps'], '30')
+        self.config_path.write_text(original.replace('fps = 30', 'fps = 45'))
+        with patch.object(cli, 'metadata') as metadata, self.assertRaises(storage.TubeBoxError):
+            cli.add(self.args)
+        metadata.assert_not_called()
+
     def test_config_roundtrip_and_missing_destination(self):
         self.assertEqual(storage.load_config(self.config_path), self.config)
         self.library.rename(self.root / 'offline')

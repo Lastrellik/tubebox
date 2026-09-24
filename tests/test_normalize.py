@@ -20,6 +20,25 @@ def media(codec='hevc', pixel='yuv420p10le', width=1920, height=808):
 
 
 class CompatibilityTests(unittest.TestCase):
+    def test_fps_cap_compatibility_encoding_and_validation(self):
+        info = media('h264', 'yuv420p')
+        info['streams'][0]['avg_frame_rate'] = '60000/1001'
+        self.assertTrue(n.reasons(n.primary_video(info), fps=30))
+        self.assertFalse(n.reasons(n.primary_video(info), fps=60))
+        for encoder in ('cpu', 'nvenc'):
+            command = n.encode_command(Path('in.mkv'), Path('out.mkv'), info, encoder=encoder, fps=30)
+            self.assertIn('fps=fps=30', command[command.index('-vf') + 1])
+        output = deepcopy(info)
+        output['streams'][0]['avg_frame_rate'] = '30/1'
+        n.validate_output(info, output, fps=30)
+        with self.assertRaises(storage.TubeBoxError):
+            n.validate_output(info, info, fps=30)
+        with self.assertRaises(storage.TubeBoxError):
+            n.validate_output(info, output, fps=60)
+        output['streams'][0]['avg_frame_rate'] = '0/0'
+        with self.assertRaises(storage.TubeBoxError):
+            n.reasons(n.primary_video(output))
+
     def test_codec_pixel_and_size_classification(self):
         for codec, pixel, width, height, compatible in [
             ('h264', 'yuv420p', 1920, 1080, True), ('h264', 'yuv420p', 640, 360, True),
@@ -295,6 +314,22 @@ class WorkflowTests(unittest.TestCase):
         (child / '.tubebox-normalized-test.mkv').write_bytes(b'transfer')
         (child / 'link.mkv').symlink_to(self.source)
         self.assertEqual(set(n.discover(self.root)), {self.source, child / 'other.MP4'})
+
+    def test_normalize_uses_saved_cap_and_override_without_destination_access(self):
+        config = self.root / 'config.ini'
+        library = self.root / 'library'
+        library.mkdir()
+        storage.initialize(config, library, local=True, fps=60)
+        library.rename(self.root / 'offline')
+        for override, expected in ((None, 60), (30, 30)):
+            argv = ['--config', str(config), 'normalize', str(self.source), '--dry-run']
+            if override:
+                argv += ['--fps', str(override)]
+            with patch.object(n.shutil, 'which', return_value='/tool'), \
+                    patch.object(n, 'normalize_file', return_value='compatible') as run, redirect_stdout(io.StringIO()):
+                self.assertEqual(cli.main(argv), 0)
+            self.assertEqual(run.call_args.kwargs['fps'], expected)
+        self.assertEqual(storage.load_config(config)['fps'], '60')
 
     def test_directory_continues_after_failure(self):
         other = self.root / 'second.mkv'

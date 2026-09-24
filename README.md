@@ -113,6 +113,40 @@ You can also edit `resolution = 1080` in the `[library]` section of your
 config file. Values such as `720`, `1080p`, `1440p`, `2160p`, and `best` are
 accepted.
 
+## Frame Rate Cap
+
+`tubebox init` prompts for a maximum frame rate of **30 or 60 fps** and saves
+it alongside the resolution preference. Press Enter to keep the displayed
+value. The default is **30 fps**, including configurations created before
+this setting existed.
+
+Both `add` and `normalize` use the saved cap automatically:
+
+```bash
+tubebox init                       # choose the cap interactively
+tubebox add "<permitted-video-url>"
+tubebox normalize /Volumes/Kodi/YouTube --dry-run
+```
+
+For noninteractive setup, use `tubebox init --fps 30`. Override the cap for
+one command without changing the saved setting:
+
+```bash
+tubebox add "<permitted-video-url>" --fps 60
+tubebox normalize movie.mkv --fps 30
+```
+
+`add` selects an available source format within both the resolution and frame
+rate limits, including on retries. Formats with unknown frame rates are
+excluded; if no suitable format exists, the download fails.
+
+`normalize` reduces videos above the cap by dropping frames, preserving
+playback speed and copying audio without re-encoding. Videos below the cap
+keep their frame rate. Without a configuration file, normalization uses
+30 fps; `--config` selects an alternate configuration for either command.
+Normalization does not require the configured download destination to be
+mounted.
+
 ## Example
 
 To add a video you have permission to download:
@@ -332,7 +366,7 @@ produce a nonzero command exit status. Symlinked files/directories and hidden
 transfer files are excluded from recursive discovery.
 
 The compatibility target is **H.264/AVC, 8-bit yuv420p, no wider than 1920 pixels
-and no taller than 1080 pixels**. If the primary video stream already meets
+and no taller than 1080 pixels**, within the saved frame rate cap. If the primary video stream already meets
 that target, the file is left untouched, regardless of container. Otherwise,
 TubeBox explains the incompatibility and automatically tries NVIDIA GPU
 encoding (`h264_nvenc`). It tests a one-second preview of the actual staged
@@ -357,7 +391,7 @@ resizing, and pixel format conversion remain on the CPU.
 See [NVIDIA's FFmpeg guide](https://docs.nvidia.com/video-technologies/video-codec-sdk/13.1/ffmpeg-with-nvidia-gpu/index.html).
 
 Both encoders produce 8-bit `yuv420p` H.264 in MKV. TubeBox preserves
-frame timing without forcing a new frame rate, retains display aspect ratio,
+frame timing when within the cap, retains display aspect ratio,
 and scales down only as needed (rounding dimensions down to even pixels).
 It does not upscale or perform HDR-to-SDR tone mapping.
 
