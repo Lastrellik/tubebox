@@ -112,6 +112,23 @@ class LibraryTests(unittest.TestCase):
             self.download()
         self.assertEqual((folder / 'poster.jpg').read_bytes(), b'custom poster')
 
+    def test_ascii_ingestion_and_collision(self):
+        self.args.yes = False
+        output = io.StringIO()
+        with patch.object(cli, 'dependencies'), patch.object(cli, 'metadata', return_value={
+                'title': 'Café 🚀 Science 👩🏽‍🚀', 'channel': 'Créateur 🌍'}), \
+                patch.object(cli, 'run', side_effect=self.fake_run), \
+                patch.object(cli.sys.stdin, 'isatty', return_value=True), \
+                patch('builtins.input', return_value='') as prompt, redirect_stdout(output):
+            cli.add(self.args)
+            self.assertTrue(all(call.args[0].isascii() for call in prompt.call_args_list))
+            with patch.object(cli, 'download_media') as download, self.assertRaisesRegex(storage.TubeBoxError, 'already exists'):
+                cli.add(self.args)
+            download.assert_not_called()
+        self.assertTrue(output.getvalue().isascii())
+        self.assertEqual({p.name for p in (self.library / 'Createur').iterdir()},
+                         {'Cafe Science.mp4', 'Cafe Science-thumb.jpg', 'poster.jpg'})
+
     def test_download_failure_cleans_staging(self):
         stages = []
         def fail(command, **kwargs):
@@ -290,7 +307,7 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(target.read_bytes(), b'old')
 
     def test_episode_overrides(self):
-        self.args.folder, self.args.name = 'Space', 'Science'
+        self.args.folder, self.args.name = 'Space 🌍', 'Science 🚀'
         self.args.season, self.args.episode = 1, 4
         self.download()
         self.assertTrue((self.library / 'Space' / 'Science - S01E04.mp4').is_file())
@@ -350,9 +367,11 @@ class CliTests(unittest.TestCase):
             self.assertNotRegex(result, r'[/\\<>:"|?*\x00]')
             self.assertFalse(result.startswith('.'))
         self.assertEqual(cli.sanitize('CON.txt'), '_CON.txt')
-        self.assertLessEqual(len(cli.sanitize('🌙' * 200).encode()), 180)
-        with self.assertRaises(storage.TubeBoxError):
-            cli.sanitize('...')
+        self.assertLessEqual(len(cli.sanitize('é' * 200).encode()), 180)
+        self.assertEqual(cli.sanitize('Café 👩🏽‍🚀 — “Space”…'), 'Cafe - _Space_')
+        for value in ('...', '🌙' * 200, '👩🏽‍🚀', '日本語'):
+            with self.subTest(value=value), self.assertRaises(storage.TubeBoxError):
+                cli.sanitize(value)
 
     def test_playlist_rejected(self):
         with patch.object(cli, 'run', return_value='{"_type":"playlist", "entries":[]}'), self.assertRaises(storage.TubeBoxError):

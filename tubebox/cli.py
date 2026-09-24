@@ -55,14 +55,22 @@ def resolution_argument(value):
         raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
+def ascii_text(value):
+    """Keep readable ASCII equivalents and discard emoji and other Unicode."""
+    value = str(value).translate(str.maketrans({'‘': "'", '’': "'", '“': '"', '”': '"',
+                                              '–': '-', '—': '-', '…': '...'}))
+    value = unicodedata.normalize('NFKD', value).encode('ascii', errors='ignore').decode('ascii')
+    return re.sub(r'\s+', ' ', value).strip()
+
+
 def sanitize(value):
-    value = unicodedata.normalize('NFC', str(value))
+    value = ascii_text(value)
     value = ''.join('_' if unicodedata.category(c).startswith('C') or c in '<>:"/\\|?*' else c for c in value)
     value = re.sub(r'\s+', ' ', value).strip(' .')
     # Leave room for episode suffixes, extensions, and artwork names on SMB.
     value = value.encode('utf-8')[:180].decode('utf-8', errors='ignore').rstrip(' .')
     if not value:
-        raise TubeBoxError('Please supply a name containing letters or numbers.')
+        raise TubeBoxError('Name is empty after ASCII cleanup. Supply --name or --folder with ASCII letters or numbers.')
     if re.match(r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)', value, re.I):
         value = '_' + value
     return value
@@ -195,9 +203,10 @@ def add(args):
     with tempfile.TemporaryDirectory(prefix='tubebox-', dir=local_temp) as temporary:
         stage = Path(temporary)
         info = metadata(args.url, cwd=stage)
-        creator = info.get('channel') or info.get('uploader') or info.get('creator') or 'Videos'
-        print(f'Title:   {info["title"]}\nChannel: {creator}')
-        folder_name, name = args.folder or creator, args.name or info['title']
+        creator = ascii_text(info.get('channel') or info.get('uploader') or info.get('creator') or 'Videos')
+        title = ascii_text(info['title'])
+        print(f'Title:   {title}\nChannel: {creator}')
+        folder_name, name = ascii_text(args.folder or creator), ascii_text(args.name or title)
         season, episode = args.season, args.episode
         if not args.yes and sys.stdin.isatty():
             folder_name = args.folder or ask('Folder', folder_name)

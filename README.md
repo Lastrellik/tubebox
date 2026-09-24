@@ -1,25 +1,14 @@
 # TubeBox
 
-**Turn online videos into a curated, kid-friendly offline Kodi library.**
+TubeBox is a command-line tool for downloading permitted online videos into
+an offline Kodi library. It uses yt-dlp to download videos, groups them by
+creator, and saves thumbnails and folder artwork alongside the media.
+Downloads and processing run locally before completed files are copied to
+your library, including libraries on mounted SMB shares.
 
-TubeBox is a small CLI that automates downloading permitted online videos with `yt-dlp`, organizing them for Kodi, fetching artwork, and saving everything directly to a local media server or Raspberry Pi.
-
-The goal is simple: paste a video URL and end up with a clean, visual media library that young kids can navigate without needing access to the original streaming service.
-
-## Why TubeBox?
-
-Kodi is great for a controlled offline media library, but getting online videos into a polished Kodi library involves a surprising amount of manual work:
-
-- Download the video
-- Choose an appropriate format
-- Download the thumbnail
-- Rename the thumbnail for Kodi
-- Organize videos into sensible folders
-- Find artwork for those folders
-- Copy everything to the media server
-- Keep filenames consistent
-
-TubeBox handles that workflow automatically.
+```bash
+tubebox add "<permitted-video-url>"
+```
 
 ## Install and Set Up
 
@@ -126,15 +115,13 @@ accepted.
 
 ## Example
 
-For example, suppose you're downloading a NASA video that you're permitted to store locally.
-
-Run:
+To add a video you have permission to download:
 
 ```bash
 tubebox add "https://www.youtube.com/watch?v=..."
 ```
 
-TubeBox retrieves the video's metadata and presents sensible defaults:
+TubeBox uses the source title and creator as defaults:
 
 ```text
 Title:   Mars Rover Overview
@@ -160,35 +147,11 @@ YouTube/
 
 The titles shown above are illustrative examples.
 
-## Kid-Friendly by Design
+## Library Layout
 
-TubeBox is designed around a simple idea:
-
-**Kids should be able to recognize what they want before they have to read it.**
-
-Videos can be grouped by creator, collection, or category:
-
-```text
-YouTube/
-├── NASA/
-│   ├── poster.jpg
-│   ├── Mars Rover Overview.mp4
-│   ├── Mars Rover Overview-thumb.jpg
-│   ├── Exploring the Moon.mp4
-│   └── Exploring the Moon-thumb.jpg
-│
-├─ Space/
-│   ├── poster.jpg
-│   └── ...
-│
-└── Science/
-    ├── poster.jpg
-    └── ...
-```
-
-Each folder can have its own `poster.jpg`, while every video gets its own thumbnail.
-
-This allows Kodi to present a visual library instead of an enormous flat list of filenames.
+Videos share a creator folder by default. Use `--folder` to group them by
+collection or category instead. Each folder has a `poster.jpg`, and each
+video has a matching `<video>-thumb.jpg` for browsing in Kodi.
 
 ## Automatic Artwork
 
@@ -213,23 +176,19 @@ downloaded and converted, the video is not added.
 
 ## Optional Episodes
 
-Not every online video is a TV episode, so TubeBox does not force everything into TV-style numbering.
-
-A normal video can simply be:
+Season and episode numbers are optional. Without them, files use the video title:
 
 ```text
 Mars Rover Overview.mp4
 Mars Rover Overview-thumb.jpg
 ```
 
-For genuinely episodic content, season and episode numbers can optionally be supplied:
+With `--season 1 --episode 4`, the names include an episode suffix:
 
 ```text
 Space Science - S01E04.mp4
 Space Science - S01E04-thumb.jpg
 ```
-
-This allows ordinary videos and structured series to coexist without unnecessarily treating every video as a television episode.
 
 ## Local Processing and Network Storage
 
@@ -303,18 +262,6 @@ TubeBox uses:
 
 `yt-dlp` handles media extraction and metadata, while `ffmpeg` handles media and image conversion where necessary.
 
-## Project Goals
-
-TubeBox aims to be:
-
-- **Simple** - paste a URL and accept sensible defaults
-- **Visual** - automatically provide artwork useful for kid-friendly navigation
-- **Offline-first** - downloaded media remains locally playable
-- **Kodi-friendly** - predictable filenames and artwork conventions
-- **Network-aware** - save directly to mounted media storage
-- **Safe to fail** - never silently dump media somewhere unintended when network storage is unavailable
-- **Maintainable** - favor straightforward behavior over unnecessary complexity
-
 TubeBox checks for all four external executables before contacting a
 video source. Installation commands are in **Install and Set Up** above.
 
@@ -360,9 +307,12 @@ copying. Already combined videos keep their original container, including
 MP4 or WebM. TubeBox does not transcode video or audio or force MP4 output;
 Kodi/LibreELEC can use the resulting codecs and containers. TubeBox uses its own
 yt-dlp options, ignoring global yt-dlp configuration for predictable
-output. Names are sanitized for common SMB and Windows restrictions.
-
-`list` and `sync` are future possibilities, not implemented commands.
+output. Titles, creator folder names, and artwork filenames are converted to
+ASCII: emojis are removed and accented letters such as `é` become `e`. This
+also applies to custom names and prompt defaults. If cleanup leaves an empty
+name, supply `--name` or `--folder` using ASCII letters or numbers. Names are
+sanitized for common SMB and Windows restrictions; existing entries are never
+overwritten when cleaned names collide.
 
 ## Normalize Existing Media for Raspberry Pi 3
 
@@ -381,7 +331,7 @@ failed counts. A failed file does not stop the remaining files. Any failures
 produce a nonzero command exit status. Symlinked files/directories and hidden
 transfer files are excluded from recursive discovery.
 
-The Pi 3 house format is **H.264/AVC, 8-bit yuv420p, no wider than 1920 pixels
+The compatibility target is **H.264/AVC, 8-bit yuv420p, no wider than 1920 pixels
 and no taller than 1080 pixels**. If the primary video stream already meets
 that target, the file is left untouched, regardless of container. Otherwise,
 TubeBox explains the incompatibility and automatically tries NVIDIA GPU
@@ -462,7 +412,7 @@ sources, encoding, or changing media. During conversion, progress includes
 percentage, encoded time, speed, and ETA when ffmpeg provides them. Use
 `--verbose` to show raw ffmpeg diagnostics.
 
-## Development and Tests
+## Troubleshooting
 
 If both download attempts fail with `HTTP Error 403: Forbidden`, the source
 rejected the requests. Changing the library path or rerunning `init` will not fix that
@@ -477,6 +427,8 @@ TubeBox displays yt-dlp warnings, including warnings from metadata retrieval.
 If the problem persists after updating, those diagnostics help distinguish
 source restrictions from extractor problems. TubeBox does not automatically
 read browser cookies or change your installed tools.
+
+## Development and Tests
 
 Run directly from the checkout without installing TubeBox:
 
@@ -510,31 +462,9 @@ TUBEBOX_TEST_NVENC=1 python3 -m unittest discover -s tests -v
 
 ## Kodi
 
-TubeBox does not replace Kodi.
-
-It prepares and organizes media so Kodi can provide the actual playback and kid-friendly browsing interface.
-
-A typical setup looks like:
-
-```text
-Internet
-   |
-   v
- TubeBox
-   |
-   | yt-dlp
-   v
-SMB Media Share
-   |
-   v
-Raspberry Pi
-   |
-   v
-  Kodi
-   |
-   v
-Kid-friendly offline library
-```
+Point Kodi at the library directory or its network share to browse and play
+the downloaded videos. TubeBox prepares the files and artwork; Kodi handles
+playback.
 
 ## Content and Copyright
 
