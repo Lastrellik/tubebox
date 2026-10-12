@@ -511,6 +511,10 @@ TUBEBOX_TEST_NVENC=1 python3 -m unittest discover -s tests -v
 
 ## Kodi
 
+The custom TubeBox Kodi add-on is preserved in
+[`kodi/script.tubebox.youtube/`](kodi/script.tubebox.youtube/).
+See [its setup and packaging notes](kodi/README.md).
+
 Point Kodi at the library directory or its network share to browse and play
 the downloaded videos. TubeBox prepares the files and artwork; Kodi handles
 playback.

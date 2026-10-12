@@ -1,0 +1,5 @@
+<addon id="script.tubebox.youtube" name="TubeBox YouTube" version="1.0.0" provider-name="TubeBox">
+  <requires><import addon="xbmc.python" version="3.0.0"/></requires>
+  <extension point="xbmc.python.script" library="main.py"><provides>executable</provides></extension>
+  <extension point="xbmc.addon.metadata"><summary lang="en_GB">Pick a local video by its picture</summary><description lang="en_GB">Random video choices and channel folders from the local Kids YouTube folder. No online videos or network requests.</description><platform>all</platform><license>MIT</license></extension>
+</addon>
