@@ -7,37 +7,55 @@
       <width>1920</width>
       <height>1080</height>
       <texture>tubebox-white.png</texture>
-      <colordiffuse>FF102333</colordiffuse>
+      <colordiffuse>FF0F0F0F</colordiffuse>
+    </control>
+    <control type="image">
+      <left>64</left>
+      <top>49</top>
+      <width>7</width>
+      <height>46</height>
+      <texture>tubebox-white.png</texture>
+      <colordiffuse>FFFF4141</colordiffuse>
     </control>
     <control type="label">
-      <left>70</left>
-      <top>40</top>
-      <width>1100</width>
-      <height>70</height>
+      <left>90</left>
+      <top>39</top>
+      <width>350</width>
+      <height>66</height>
       <font>font30</font>
-      <label>YouTube</label>
-      <textcolor>FFFFFFFF</textcolor>
+      <label>TubeBox</label>
+      <textcolor>FFF1F1F1</textcolor>
     </control>
     <control type="label">
-      <left>70</left>
-      <top>118</top>
-      <width>1300</width>
-      <height>50</height>
-      <font>font24_title</font>
-      <label>$INFO[Window.Property(Row1Label)]</label>
-      <textcolor>FFFFFFFF</textcolor>
+      <left>90</left>
+      <top>101</top>
+      <width>800</width>
+      <height>32</height>
+      <font>font13</font>
+      <label>A little curiosity. A new favorite.</label>
+      <textcolor>FFAAAAAA</textcolor>
+    </control>
+    <control type="image">
+      <left>64</left>
+      <top>149</top>
+      <width>1792</width>
+      <height>1</height>
+      <texture>tubebox-white.png</texture>
+      <colordiffuse>FF292929</colordiffuse>
     </control>
     <control type="button" id="10">
-      <left>1360</left>
-      <top>60</top>
-      <width>440</width>
-      <height>70</height>
-      <label>More choices</label>
+      <left>1540</left>
+      <top>49</top>
+      <width>316</width>
+      <height>60</height>
+      <label>Shuffle choices</label>
       <font>font16</font>
-      <textcolor>FFFFFFFF</textcolor>
-      <focusedcolor>FFFFFFFF</focusedcolor>
-      <texturefocus colordiffuse="FF258AD1">tubebox-white.png</texturefocus>
-      <texturenofocus colordiffuse="FF1B3549">tubebox-white.png</texturenofocus>
+      <textcolor>FFF1F1F1</textcolor>
+      <focusedcolor>FF0F0F0F</focusedcolor>
+      <align>center</align>
+      <aligny>center</aligny>
+      <texturefocus colordiffuse="FFF1F1F1">tubebox-white.png</texturefocus>
+      <texturenofocus colordiffuse="FF272727">tubebox-white.png</texturenofocus>
       <onup condition="String.IsEqual(Window.Property(Row1Available),true)">100</onup>
       <onup condition="!String.IsEqual(Window.Property(Row1Available),true)">10</onup>
       <ondown condition="String.IsEqual(Window.Property(Row1Available),true)">100</ondown>
@@ -47,16 +65,18 @@
       <onright>12</onright>
     </control>
     <control type="button" id="11">
-      <left>70</left>
-      <top>960</top>
-      <width>310</width>
-      <height>70</height>
+      <left>64</left>
+      <top>974</top>
+      <width>280</width>
+      <height>60</height>
       <label>Browse folders</label>
       <font>font16</font>
-      <textcolor>FFFFFFFF</textcolor>
-      <focusedcolor>FFFFFFFF</focusedcolor>
-      <texturefocus colordiffuse="FF258AD1">tubebox-white.png</texturefocus>
-      <texturenofocus colordiffuse="FF1B3549">tubebox-white.png</texturenofocus>
+      <textcolor>FFF1F1F1</textcolor>
+      <focusedcolor>FF0F0F0F</focusedcolor>
+      <align>center</align>
+      <aligny>center</aligny>
+      <texturefocus colordiffuse="FFF1F1F1">tubebox-white.png</texturefocus>
+      <texturenofocus colordiffuse="FF272727">tubebox-white.png</texturenofocus>
       <ondown condition="String.IsEqual(Window.Property(Row1Available),true)">100</ondown>
       <ondown condition="!String.IsEqual(Window.Property(Row1Available),true) + String.IsEqual(Window.Property(Row2Available),true)">200</ondown>
       <ondown condition="!String.IsEqual(Window.Property(Row1Available),true) + !String.IsEqual(Window.Property(Row2Available),true)">11</ondown>
@@ -67,16 +87,18 @@
       <onup condition="!String.IsEqual(Window.Property(Row2Available),true) + !String.IsEqual(Window.Property(Row1Available),true)">10</onup>
     </control>
     <control type="button" id="12">
-      <left>420</left>
-      <top>960</top>
-      <width>310</width>
-      <height>70</height>
+      <left>362</left>
+      <top>974</top>
+      <width>150</width>
+      <height>60</height>
       <label>Back</label>
       <font>font16</font>
-      <textcolor>FFFFFFFF</textcolor>
-      <focusedcolor>FFFFFFFF</focusedcolor>
-      <texturefocus colordiffuse="FF258AD1">tubebox-white.png</texturefocus>
-      <texturenofocus colordiffuse="FF1B3549">tubebox-white.png</texturenofocus>
+      <textcolor>FFF1F1F1</textcolor>
+      <focusedcolor>FF0F0F0F</focusedcolor>
+      <align>center</align>
+      <aligny>center</aligny>
+      <texturefocus colordiffuse="FFF1F1F1">tubebox-white.png</texturefocus>
+      <texturenofocus colordiffuse="FF272727">tubebox-white.png</texturenofocus>
       <ondown condition="String.IsEqual(Window.Property(Row1Available),true)">100</ondown>
       <ondown condition="!String.IsEqual(Window.Property(Row1Available),true) + String.IsEqual(Window.Property(Row2Available),true)">200</ondown>
       <ondown condition="!String.IsEqual(Window.Property(Row1Available),true) + !String.IsEqual(Window.Property(Row2Available),true)">11</ondown>
@@ -86,241 +108,349 @@
       <onup condition="!String.IsEqual(Window.Property(Row2Available),true) + String.IsEqual(Window.Property(Row1Available),true)">100</onup>
       <onup condition="!String.IsEqual(Window.Property(Row2Available),true) + !String.IsEqual(Window.Property(Row1Available),true)">10</onup>
     </control>
+    <control type="label">
+      <left>64</left>
+      <top>166</top>
+      <width>1300</width>
+      <height>40</height>
+      <font>font24_title</font>
+      <label>$INFO[Window.Property(Row1Label)]</label>
+      <textcolor>FFF1F1F1</textcolor>
+    </control>
+    <control type="label">
+      <left>1570</left>
+      <top>166</top>
+      <width>286</width>
+      <height>40</height>
+      <font>font16</font>
+      <label>$INFO[Container(100).CurrentItem] / $INFO[Container(100).NumItems]</label>
+      <textcolor>FFAAAAAA</textcolor>
+      <align>right</align>
+      <visible>String.IsEqual(Window.Property(Row1Available),true)</visible>
+    </control>
     <control type="fixedlist" id="100">
-      <left>70</left>
-      <top>170</top>
-      <width>1780</width>
-      <height>280</height>
+      <left>64</left>
+      <top>206</top>
+      <width>1792</width>
+      <height>306</height>
       <orientation>horizontal</orientation>
       <focusposition>0</focusposition>
+      <scrolltime>180</scrolltime>
       <onup>10</onup>
       <onleft>100</onleft>
       <onright>100</onright>
-      <scrolltime>200</scrolltime>
-      <itemlayout width="350" height="280">
+      <ondown condition="String.IsEqual(Window.Property(Row2Available),true)">200</ondown>
+      <ondown condition="!String.IsEqual(Window.Property(Row2Available),true)">11</ondown>
+      <visible>String.IsEqual(Window.Property(Row1Available),true)</visible>
+      <itemlayout width="414" height="306">
         <control type="image">
-          <left>0</left>
-          <top>0</top>
-          <width>340</width>
-          <height>270</height>
+          <left>4</left>
+          <top>4</top>
+          <width>392</width>
+          <height>224</height>
           <texture>tubebox-white.png</texture>
-          <colordiffuse>FF1B3549</colordiffuse>
+          <colordiffuse>FF272727</colordiffuse>
         </control>
         <control type="image">
-          <left>10</left>
-          <top>10</top>
-          <width>320</width>
-          <height>170</height>
+          <left>8</left>
+          <top>8</top>
+          <width>384</width>
+          <height>216</height>
+          <texture>tubebox-white.png</texture>
+          <colordiffuse>FF181818</colordiffuse>
+        </control>
+        <control type="image">
+          <left>8</left>
+          <top>8</top>
+          <width>384</width>
+          <height>216</height>
           <texture>$INFO[ListItem.Art(thumb)]</texture>
           <aspectratio>keep</aspectratio>
         </control>
         <control type="label">
-          <left>12</left>
-          <top>185</top>
-          <width>314</width>
-          <height>36</height>
+          <left>8</left>
+          <top>234</top>
+          <width>384</width>
+          <height>38</height>
           <font>font13</font>
           <label>$INFO[ListItem.Label]</label>
-          <textcolor>FFFFFFFF</textcolor>
+          <textcolor>FFF1F1F1</textcolor>
+          <aligny>center</aligny>
+          <wrapmultiline>false</wrapmultiline>
+          <scrollspeed>40</scrollspeed>
           <scroll>false</scroll>
         </control>
         <control type="label">
-          <left>12</left>
-          <top>225</top>
-          <width>314</width>
-          <height>32</height>
+          <left>8</left>
+          <top>280</top>
+          <width>384</width>
+          <height>26</height>
           <font>font12</font>
           <label>$INFO[ListItem.Label2]</label>
-          <textcolor>FFC6DDEA</textcolor>
+          <textcolor>FFAAAAAA</textcolor>
         </control>
       </itemlayout>
-      <focusedlayout width="350" height="280">
+      <focusedlayout width="414" height="306">
         <control type="image">
-          <left>0</left>
-          <top>0</top>
-          <width>340</width>
-          <height>270</height>
+          <left>4</left>
+          <top>4</top>
+          <width>392</width>
+          <height>224</height>
           <texture>tubebox-white.png</texture>
-          <colordiffuse>FF1B3549</colordiffuse>
+          <colordiffuse>FF272727</colordiffuse>
         </control>
         <control type="image">
           <left>0</left>
           <top>0</top>
-          <width>340</width>
-          <height>270</height>
+          <width>400</width>
+          <height>232</height>
           <texture>tubebox-white.png</texture>
-          <colordiffuse>FF258AD1</colordiffuse>
+          <colordiffuse>FFF1F1F1</colordiffuse>
           <visible>Control.HasFocus(100)</visible>
         </control>
         <control type="image">
-          <left>10</left>
-          <top>10</top>
-          <width>320</width>
-          <height>170</height>
+          <left>8</left>
+          <top>8</top>
+          <width>384</width>
+          <height>216</height>
+          <texture>tubebox-white.png</texture>
+          <colordiffuse>FF181818</colordiffuse>
+        </control>
+        <control type="image">
+          <left>8</left>
+          <top>8</top>
+          <width>384</width>
+          <height>216</height>
           <texture>$INFO[ListItem.Art(thumb)]</texture>
           <aspectratio>keep</aspectratio>
         </control>
         <control type="label">
-          <left>12</left>
-          <top>185</top>
-          <width>314</width>
-          <height>36</height>
+          <left>8</left>
+          <top>234</top>
+          <width>384</width>
+          <height>38</height>
           <font>font13</font>
           <label>$INFO[ListItem.Label]</label>
-          <textcolor>FFFFFFFF</textcolor>
-          <scroll>false</scroll>
+          <textcolor>FFF1F1F1</textcolor>
+          <aligny>center</aligny>
+          <wrapmultiline>false</wrapmultiline>
+          <scrollspeed>40</scrollspeed>
         </control>
         <control type="label">
-          <left>12</left>
-          <top>225</top>
-          <width>314</width>
-          <height>32</height>
+          <left>8</left>
+          <top>280</top>
+          <width>384</width>
+          <height>26</height>
           <font>font12</font>
           <label>$INFO[ListItem.Label2]</label>
-          <textcolor>FFC6DDEA</textcolor>
+          <textcolor>FFAAAAAA</textcolor>
         </control>
       </focusedlayout>
-      <ondown condition="String.IsEqual(Window.Property(Row2Available),true)">200</ondown>
-      <ondown condition="!String.IsEqual(Window.Property(Row2Available),true)">11</ondown>
     </control>
-    <control type="textbox" id="101">
-      <left>70</left>
-      <top>815</top>
-      <width>1780</width>
-      <height>125</height>
+    <control type="label">
+      <left>72</left>
+      <top>292</top>
+      <width>1700</width>
+      <height>50</height>
       <font>font16</font>
-      <textcolor>FFFFFFFF</textcolor>
+      <label>No videos available for this row.</label>
+      <textcolor>FFAAAAAA</textcolor>
+      <visible>!String.IsEqual(Window.Property(Row1Available),true)</visible>
+    </control>
+    <control type="label" id="101">
+      <left>64</left>
+      <top>901</top>
+      <width>1792</width>
+      <height>58</height>
+      <font>font16</font>
+      <textcolor>FFF1F1F1</textcolor>
       <label>$INFO[Container(100).ListItem.Label]</label>
-      <autoscroll delay="3000" time="2000" repeat="5000">Control.HasFocus(100)</autoscroll>
-      <visible>!Control.HasFocus(200)</visible>
+      <visible>Control.HasFocus(100)</visible>
+      <wrapmultiline>false</wrapmultiline>
+      <aligny>center</aligny>
+      <scroll>true</scroll>
+      <scrollspeed>40</scrollspeed>
     </control>
-    <control type="textbox" id="201">
-      <left>70</left>
-      <top>815</top>
-      <width>1780</width>
-      <height>125</height>
+    <control type="label">
+      <left>64</left>
+      <top>526</top>
+      <width>1300</width>
+      <height>40</height>
+      <font>font24_title</font>
+      <label>$INFO[Window.Property(Row2Label)]</label>
+      <textcolor>FFF1F1F1</textcolor>
+    </control>
+    <control type="label">
+      <left>1570</left>
+      <top>526</top>
+      <width>286</width>
+      <height>40</height>
       <font>font16</font>
-      <textcolor>FFFFFFFF</textcolor>
-      <label>$INFO[Container(200).ListItem.Label]</label>
-      <autoscroll delay="3000" time="2000" repeat="5000">Control.HasFocus(200)</autoscroll>
-      <visible>Control.HasFocus(200)</visible>
+      <label>$INFO[Container(200).CurrentItem] / $INFO[Container(200).NumItems]</label>
+      <textcolor>FFAAAAAA</textcolor>
+      <align>right</align>
+      <visible>String.IsEqual(Window.Property(Row2Available),true)</visible>
     </control>
     <control type="fixedlist" id="200">
-      <left>70</left>
-      <top>510</top>
-      <width>1780</width>
-      <height>280</height>
+      <left>64</left>
+      <top>566</top>
+      <width>1792</width>
+      <height>306</height>
       <orientation>horizontal</orientation>
       <focusposition>0</focusposition>
+      <scrolltime>180</scrolltime>
       <ondown>11</ondown>
       <onup condition="String.IsEqual(Window.Property(Row1Available),true)">100</onup>
       <onup condition="!String.IsEqual(Window.Property(Row1Available),true)">10</onup>
       <onleft>200</onleft>
       <onright>200</onright>
-      <scrolltime>200</scrolltime>
-      <itemlayout width="350" height="280">
+      <visible>String.IsEqual(Window.Property(Row2Available),true)</visible>
+      <itemlayout width="414" height="306">
         <control type="image">
-          <left>0</left>
-          <top>0</top>
-          <width>340</width>
-          <height>270</height>
+          <left>4</left>
+          <top>4</top>
+          <width>392</width>
+          <height>224</height>
           <texture>tubebox-white.png</texture>
-          <colordiffuse>FF1B3549</colordiffuse>
+          <colordiffuse>FF272727</colordiffuse>
         </control>
         <control type="image">
-          <left>10</left>
-          <top>10</top>
-          <width>320</width>
-          <height>170</height>
+          <left>8</left>
+          <top>8</top>
+          <width>384</width>
+          <height>216</height>
+          <texture>tubebox-white.png</texture>
+          <colordiffuse>FF181818</colordiffuse>
+        </control>
+        <control type="image">
+          <left>8</left>
+          <top>8</top>
+          <width>384</width>
+          <height>216</height>
           <texture>$INFO[ListItem.Art(thumb)]</texture>
           <aspectratio>keep</aspectratio>
         </control>
         <control type="label">
-          <left>12</left>
-          <top>185</top>
-          <width>314</width>
-          <height>36</height>
+          <left>8</left>
+          <top>234</top>
+          <width>384</width>
+          <height>38</height>
           <font>font13</font>
           <label>$INFO[ListItem.Label]</label>
-          <textcolor>FFFFFFFF</textcolor>
+          <textcolor>FFF1F1F1</textcolor>
+          <aligny>center</aligny>
+          <wrapmultiline>false</wrapmultiline>
+          <scrollspeed>40</scrollspeed>
           <scroll>false</scroll>
         </control>
         <control type="label">
-          <left>12</left>
-          <top>225</top>
-          <width>314</width>
-          <height>32</height>
+          <left>8</left>
+          <top>280</top>
+          <width>384</width>
+          <height>26</height>
           <font>font12</font>
           <label>$INFO[ListItem.Label2]</label>
-          <textcolor>FFC6DDEA</textcolor>
+          <textcolor>FFAAAAAA</textcolor>
         </control>
       </itemlayout>
-      <focusedlayout width="350" height="280">
+      <focusedlayout width="414" height="306">
         <control type="image">
-          <left>0</left>
-          <top>0</top>
-          <width>340</width>
-          <height>270</height>
+          <left>4</left>
+          <top>4</top>
+          <width>392</width>
+          <height>224</height>
           <texture>tubebox-white.png</texture>
-          <colordiffuse>FF1B3549</colordiffuse>
+          <colordiffuse>FF272727</colordiffuse>
         </control>
         <control type="image">
           <left>0</left>
           <top>0</top>
-          <width>340</width>
-          <height>270</height>
+          <width>400</width>
+          <height>232</height>
           <texture>tubebox-white.png</texture>
-          <colordiffuse>FF258AD1</colordiffuse>
+          <colordiffuse>FFF1F1F1</colordiffuse>
           <visible>Control.HasFocus(200)</visible>
         </control>
         <control type="image">
-          <left>10</left>
-          <top>10</top>
-          <width>320</width>
-          <height>170</height>
+          <left>8</left>
+          <top>8</top>
+          <width>384</width>
+          <height>216</height>
+          <texture>tubebox-white.png</texture>
+          <colordiffuse>FF181818</colordiffuse>
+        </control>
+        <control type="image">
+          <left>8</left>
+          <top>8</top>
+          <width>384</width>
+          <height>216</height>
           <texture>$INFO[ListItem.Art(thumb)]</texture>
           <aspectratio>keep</aspectratio>
         </control>
         <control type="label">
-          <left>12</left>
-          <top>185</top>
-          <width>314</width>
-          <height>36</height>
+          <left>8</left>
+          <top>234</top>
+          <width>384</width>
+          <height>38</height>
           <font>font13</font>
           <label>$INFO[ListItem.Label]</label>
-          <textcolor>FFFFFFFF</textcolor>
-          <scroll>false</scroll>
+          <textcolor>FFF1F1F1</textcolor>
+          <aligny>center</aligny>
+          <wrapmultiline>false</wrapmultiline>
+          <scrollspeed>40</scrollspeed>
         </control>
         <control type="label">
-          <left>12</left>
-          <top>225</top>
-          <width>314</width>
-          <height>32</height>
+          <left>8</left>
+          <top>280</top>
+          <width>384</width>
+          <height>26</height>
           <font>font12</font>
           <label>$INFO[ListItem.Label2]</label>
-          <textcolor>FFC6DDEA</textcolor>
+          <textcolor>FFAAAAAA</textcolor>
         </control>
       </focusedlayout>
-      <visible>String.IsEqual(Window.Property(Row2Available),true)</visible>
     </control>
     <control type="label">
-      <left>70</left>
-      <top>460</top>
-      <width>1780</width>
-      <height>45</height>
-      <font>font24_title</font>
-      <label>$INFO[Window.Property(Row2Label)]</label>
-      <textcolor>FFFFFFFF</textcolor>
-    </control>
-    <control type="label">
-      <left>70</left>
-      <top>560</top>
-      <width>1780</width>
-      <height>45</height>
+      <left>72</left>
+      <top>652</top>
+      <width>1700</width>
+      <height>50</height>
       <font>font16</font>
       <label>No videos available for this row.</label>
-      <textcolor>FFC6DDEA</textcolor>
+      <textcolor>FFAAAAAA</textcolor>
       <visible>!String.IsEqual(Window.Property(Row2Available),true)</visible>
+    </control>
+    <control type="label" id="201">
+      <left>64</left>
+      <top>901</top>
+      <width>1792</width>
+      <height>58</height>
+      <font>font16</font>
+      <textcolor>FFF1F1F1</textcolor>
+      <label>$INFO[Container(200).ListItem.Label]</label>
+      <visible>Control.HasFocus(200)</visible>
+      <wrapmultiline>false</wrapmultiline>
+      <aligny>center</aligny>
+      <scroll>true</scroll>
+      <scrollspeed>40</scrollspeed>
+    </control>
+    <control type="image">
+      <left>64</left>
+      <top>884</top>
+      <width>1792</width>
+      <height>1</height>
+      <texture>tubebox-white.png</texture>
+      <colordiffuse>FF292929</colordiffuse>
+    </control>
+    <control type="label">
+      <left>730</left>
+      <top>982</top>
+      <width>1126</width>
+      <height>42</height>
+      <font>font13</font>
+      <label>Left / Right to explore     OK to play</label>
+      <textcolor>FFAAAAAA</textcolor>
+      <align>right</align>
     </control>
   </controls>
 </window>

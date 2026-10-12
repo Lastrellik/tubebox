@@ -21,7 +21,7 @@ Edit `script.tubebox.youtube/config.json`, then deploy and reopen the app:
 {
   "media_directory": "/media/MyDrive/Kids/YouTube",
   "rows": [
-    {"type": "random", "label": "Pick a video", "count": 25},
+    {"type": "random", "label": "For you", "count": 25},
     {"type": "random", "label": "More to explore", "count": 25}
   ]
 }
@@ -38,6 +38,21 @@ not in Kodi's Settings UI; replacing the add-on also replaces this file.
 Change the media path for a different installation. The app requires Kodi's
 Python APIs and cannot run as a standalone desktop Python program.
 An unavailable media directory produces a notification, not a local fallback.
+
+## Appearance
+
+The local dark layout uses charcoal backgrounds, 384×216 thumbnails, single-line
+card titles with native focus-only horizontal scrolling, muted channel labels, and a white border around the focused
+thumbnail. The header offers **Shuffle choices**; Browse folders and Back
+remain at the bottom. Each row shows its current position and item count.
+The focused title also appears beneath the rows on a single scrolling line. Selection and playback
+behavior are unchanged, and there are no additional dependencies or animated
+backgrounds.
+
+[View the illustrative layout preview](preview/dark-layout.svg). This is a
+mockup with fictional titles and geometric thumbnail placeholders, not a Kodi
+screenshot. Kodi uses the active skin's fonts, so final text metrics need an
+on-device check before release. The preview is not packaged in the add-on.
 
 ## Package and install
 

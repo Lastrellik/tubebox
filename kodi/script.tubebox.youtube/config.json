@@ -1,7 +1,7 @@
 {
   "media_directory": "/media/MyDrive/Kids/YouTube",
   "rows": [
-    {"type": "random", "label": "Pick a video", "count": 25},
+    {"type": "random", "label": "For you", "count": 25},
     {"type": "random", "label": "More to explore", "count": 25}
   ]
 }
