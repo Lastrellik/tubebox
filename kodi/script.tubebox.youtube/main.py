@@ -1,5 +1,4 @@
 import os
-import random
 import time
 from pathlib import Path
 import xbmc
@@ -7,8 +6,8 @@ import xbmcaddon
 import xbmcgui
 import xbmcvfs
 from watch_history import recent_videos
+from rows import load_config, build_rows
 
-ROOT = Path('/media/MyDrive/Kids/YouTube')
 EXTENSIONS = {'.mp4', '.mkv', '.webm', '.mov', '.avi', '.m4v', '.ts', '.ogv'}
 
 
@@ -46,14 +45,16 @@ class YouTubeWindow(xbmcgui.WindowXML):
 
     def onInit(self):
         if getattr(self, 'ready', False):
-            self.refresh_history()
+            self.refresh()
             return
         self.ready = True
         self.window_id = xbmcgui.getCurrentWindowId()
         self.videos = []
-        self.history = None
+        self.row_paths = [[], []]
+        for index, row in enumerate(CONFIG['rows'], 1):
+            self.setProperty(f'Row{index}Label', row['label'])
         self.refresh(force=True)
-        self.setFocusId(100 if self.videos else 11)
+        self.setFocusId(self.first_row_control())
 
     def refresh(self, force=False):
         try:
@@ -64,29 +65,9 @@ class YouTubeWindow(xbmcgui.WindowXML):
         if force or videos != self.videos:
             self.videos = videos
             self.fill_videos()
-        self.refresh_history()
 
-    def refresh_history(self):
-        try:
-            history = recent_videos(xbmcvfs.translatePath("special://database/"), ROOT, self.videos)
-        except Exception as exc:
-            xbmc.log("TubeBox history: " + str(exc), xbmc.LOGWARNING)
-            return
-        if history == self.history:
-            return
-        shelf = self.getControl(200)
-        selected = shelf.getSelectedItem() if self.history else None
-        selected_path = selected.getProperty("video") if selected else None
-        self.history = history
-        shelf.reset()
-        for path in history:
-            shelf.addItem(self.video_item(path))
-        if history:
-            position = next((i for i, path in enumerate(history) if str(path) == selected_path), 0)
-            shelf.selectItem(position)
-        self.setProperty("HistoryAvailable", "true" if history else "false")
-        if not history and xbmc.getCondVisibility('Control.HasFocus(200)'):
-            self.setFocusId(100 if self.videos else 11)
+    def first_row_control(self):
+        return next((i * 100 for i, row in enumerate(self.row_paths, 1) if row), 11)
 
     def video_item(self, path):
         item = xbmcgui.ListItem(label=path.stem, label2=path.parent.name, path=str(path))
@@ -95,16 +76,29 @@ class YouTubeWindow(xbmcgui.WindowXML):
         return item
 
     def fill_videos(self):
-        shelf = self.getControl(100)
-        shelf.reset()
-        for path in random.sample(self.videos, min(10, len(self.videos))):
-            shelf.addItem(self.video_item(path))
+        history = []
+        if any(row['type'] == 'recently_watched' for row in CONFIG['rows']):
+            try:
+                history = recent_videos(xbmcvfs.translatePath('special://database/'),
+                                        ROOT, self.videos, limit=200)
+            except Exception as exc:
+                xbmc.log('TubeBox history: ' + str(exc), xbmc.LOGWARNING)
+        previous = [path for row in self.row_paths for path in row]
+        self.row_paths = build_rows(self.videos, CONFIG['rows'], history, previous)
+        for index, paths in enumerate(self.row_paths, 1):
+            shelf = self.getControl(index * 100)
+            shelf.reset()
+            for path in paths:
+                shelf.addItem(self.video_item(path))
+            self.setProperty(f'Row{index}Available', 'true' if paths else 'false')
+        if not self.row_paths[1] and xbmc.getCondVisibility('Control.HasFocus(200)'):
+            self.setFocusId(self.first_row_control())
 
     def onClick(self, control):
         if control == 10:
             self.refresh(force=True)
             if self.videos:
-                self.setFocusId(100)
+                self.setFocusId(self.first_row_control())
         elif control in (100, 200):
             item = self.getControl(control).getSelectedItem()
             if item:
@@ -130,18 +124,14 @@ class YouTubeWindow(xbmcgui.WindowXML):
 
 if __name__ == '__main__':
     try:
+        CONFIG = load_config(Path(__file__).with_name('config.json'))
+        ROOT = Path(CONFIG['media_directory'])
         discover(ROOT)
         window = YouTubeWindow('YouTube.xml', xbmcaddon.Addon().getAddonInfo('path'), 'Default', '1080i')
         window.show()
         monitor = xbmc.Monitor()
-        next_history_check = time.monotonic() + 5
         next_check = time.monotonic() + 30
         while not window.closed and not monitor.waitForAbort(1):
-            if (time.monotonic() >= next_history_check and
-                    not xbmc.Player().isPlaying() and
-                    xbmcgui.getCurrentWindowId() == getattr(window, 'window_id', None)):
-                window.refresh_history()
-                next_history_check = time.monotonic() + 5
             if time.monotonic() < next_check:
                 continue
             next_check = time.monotonic() + 30
@@ -157,4 +147,4 @@ if __name__ == '__main__':
             xbmc.executebuiltin('ActivateWindow(Videos,"' + path + '/",return)')
     except Exception as exc:
         xbmc.log('TubeBox YouTube: ' + str(exc), xbmc.LOGERROR)
-        xbmcgui.Dialog().notification('YouTube', 'Could not open videos. Check the media drive.')
+        xbmcgui.Dialog().notification('YouTube', 'Could not open videos. Check configuration and the media drive.')

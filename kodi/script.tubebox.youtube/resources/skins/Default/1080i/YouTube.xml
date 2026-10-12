@@ -24,7 +24,7 @@
       <width>1300</width>
       <height>50</height>
       <font>font24_title</font>
-      <label>Pick a video</label>
+      <label>$INFO[Window.Property(Row1Label)]</label>
       <textcolor>FFFFFFFF</textcolor>
     </control>
     <control type="button" id="10">
@@ -38,8 +38,11 @@
       <focusedcolor>FFFFFFFF</focusedcolor>
       <texturefocus colordiffuse="FF258AD1">tubebox-white.png</texturefocus>
       <texturenofocus colordiffuse="FF1B3549">tubebox-white.png</texturenofocus>
-      <onup>100</onup>
-      <ondown>100</ondown>
+      <onup condition="String.IsEqual(Window.Property(Row1Available),true)">100</onup>
+      <onup condition="!String.IsEqual(Window.Property(Row1Available),true)">10</onup>
+      <ondown condition="String.IsEqual(Window.Property(Row1Available),true)">100</ondown>
+      <ondown condition="!String.IsEqual(Window.Property(Row1Available),true) + String.IsEqual(Window.Property(Row2Available),true)">200</ondown>
+      <ondown condition="!String.IsEqual(Window.Property(Row1Available),true) + !String.IsEqual(Window.Property(Row2Available),true)">11</ondown>
       <onleft>12</onleft>
       <onright>12</onright>
     </control>
@@ -54,11 +57,14 @@
       <focusedcolor>FFFFFFFF</focusedcolor>
       <texturefocus colordiffuse="FF258AD1">tubebox-white.png</texturefocus>
       <texturenofocus colordiffuse="FF1B3549">tubebox-white.png</texturenofocus>
-      <ondown>100</ondown>
+      <ondown condition="String.IsEqual(Window.Property(Row1Available),true)">100</ondown>
+      <ondown condition="!String.IsEqual(Window.Property(Row1Available),true) + String.IsEqual(Window.Property(Row2Available),true)">200</ondown>
+      <ondown condition="!String.IsEqual(Window.Property(Row1Available),true) + !String.IsEqual(Window.Property(Row2Available),true)">11</ondown>
       <onleft>11</onleft>
       <onright>12</onright>
-      <onup condition="String.IsEqual(Window.Property(HistoryAvailable),true)">200</onup>
-      <onup condition="!String.IsEqual(Window.Property(HistoryAvailable),true)">100</onup>
+      <onup condition="String.IsEqual(Window.Property(Row2Available),true)">200</onup>
+      <onup condition="!String.IsEqual(Window.Property(Row2Available),true) + String.IsEqual(Window.Property(Row1Available),true)">100</onup>
+      <onup condition="!String.IsEqual(Window.Property(Row2Available),true) + !String.IsEqual(Window.Property(Row1Available),true)">10</onup>
     </control>
     <control type="button" id="12">
       <left>420</left>
@@ -71,11 +77,14 @@
       <focusedcolor>FFFFFFFF</focusedcolor>
       <texturefocus colordiffuse="FF258AD1">tubebox-white.png</texturefocus>
       <texturenofocus colordiffuse="FF1B3549">tubebox-white.png</texturenofocus>
-      <ondown>100</ondown>
+      <ondown condition="String.IsEqual(Window.Property(Row1Available),true)">100</ondown>
+      <ondown condition="!String.IsEqual(Window.Property(Row1Available),true) + String.IsEqual(Window.Property(Row2Available),true)">200</ondown>
+      <ondown condition="!String.IsEqual(Window.Property(Row1Available),true) + !String.IsEqual(Window.Property(Row2Available),true)">11</ondown>
       <onleft>11</onleft>
       <onright>10</onright>
-      <onup condition="String.IsEqual(Window.Property(HistoryAvailable),true)">200</onup>
-      <onup condition="!String.IsEqual(Window.Property(HistoryAvailable),true)">100</onup>
+      <onup condition="String.IsEqual(Window.Property(Row2Available),true)">200</onup>
+      <onup condition="!String.IsEqual(Window.Property(Row2Available),true) + String.IsEqual(Window.Property(Row1Available),true)">100</onup>
+      <onup condition="!String.IsEqual(Window.Property(Row2Available),true) + !String.IsEqual(Window.Property(Row1Available),true)">10</onup>
     </control>
     <control type="fixedlist" id="100">
       <left>70</left>
@@ -171,8 +180,8 @@
           <textcolor>FFC6DDEA</textcolor>
         </control>
       </focusedlayout>
-      <ondown condition="String.IsEqual(Window.Property(HistoryAvailable),true)">200</ondown>
-      <ondown condition="!String.IsEqual(Window.Property(HistoryAvailable),true)">11</ondown>
+      <ondown condition="String.IsEqual(Window.Property(Row2Available),true)">200</ondown>
+      <ondown condition="!String.IsEqual(Window.Property(Row2Available),true)">11</ondown>
     </control>
     <control type="textbox" id="101">
       <left>70</left>
@@ -204,7 +213,8 @@
       <orientation>horizontal</orientation>
       <focusposition>0</focusposition>
       <ondown>11</ondown>
-      <onup>100</onup>
+      <onup condition="String.IsEqual(Window.Property(Row1Available),true)">100</onup>
+      <onup condition="!String.IsEqual(Window.Property(Row1Available),true)">10</onup>
       <onleft>200</onleft>
       <onright>200</onright>
       <scrolltime>200</scrolltime>
@@ -291,7 +301,7 @@
           <textcolor>FFC6DDEA</textcolor>
         </control>
       </focusedlayout>
-      <visible>String.IsEqual(Window.Property(HistoryAvailable),true)</visible>
+      <visible>String.IsEqual(Window.Property(Row2Available),true)</visible>
     </control>
     <control type="label">
       <left>70</left>
@@ -299,7 +309,7 @@
       <width>1780</width>
       <height>45</height>
       <font>font24_title</font>
-      <label>Recently watched</label>
+      <label>$INFO[Window.Property(Row2Label)]</label>
       <textcolor>FFFFFFFF</textcolor>
     </control>
     <control type="label">
@@ -308,9 +318,9 @@
       <width>1780</width>
       <height>45</height>
       <font>font16</font>
-      <label>Videos you watch will appear here.</label>
+      <label>No videos available for this row.</label>
       <textcolor>FFC6DDEA</textcolor>
-      <visible>!String.IsEqual(Window.Property(HistoryAvailable),true)</visible>
+      <visible>!String.IsEqual(Window.Property(Row2Available),true)</visible>
     </control>
   </controls>
 </window>
