@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from .storage import TubeBoxError, check_destination, config_path, initialize, load_config, resolution, fps_limit
 
@@ -187,6 +187,59 @@ def folder_art(info, stage, thumb):
     return result
 
 
+def youtube_playlist_url(url):
+    parsed = urlparse(url)
+    host = (parsed.hostname or '').lower()
+    if parsed.scheme not in ('http', 'https') or not (
+            host == 'youtu.be' or host == 'youtube.com' or host.endswith('.youtube.com')):
+        return None
+    playlist = parse_qs(parsed.query).get('list', [''])[0]
+    return 'https://www.youtube.com/playlist?' + urlencode({'list': playlist}) if playlist else None
+
+
+def add_playlist(args, url):
+    if args.name is not None or args.episode is not None:
+        raise TubeBoxError('--name and --episode apply to single videos. Omit --playlist for the linked video.')
+    check_destination(load_config(args.config))
+    dependencies()
+    with tempfile.TemporaryDirectory(prefix='tubebox-playlist-') as temporary:
+        raw = run(['yt-dlp', '--ignore-config', '--no-cache-dir', '--socket-timeout', '20',
+                   '--flat-playlist', '--yes-playlist', '--dump-single-json', '--', url],
+                  capture=True, timeout=180, cwd=temporary)
+    try:
+        info = json.loads(raw)
+    except (ValueError, TypeError) as exc:
+        raise TubeBoxError('yt-dlp returned invalid playlist metadata.') from exc
+    if not isinstance(info, dict) or not isinstance(info.get('entries'), list) or not info['entries']:
+        raise TubeBoxError('The playlist contains no listed videos.')
+    entries = info['entries']
+    print(f'Playlist: {ascii_text(info.get("title") or "YouTube playlist")} ({len(entries)} listed videos)')
+    added = 0
+    failures = []
+    for index, entry in enumerate(entries, 1):
+        video_id = entry.get('id') if isinstance(entry, dict) else None
+        title = ascii_text(entry.get('title') or video_id or 'Unavailable video') if isinstance(entry, dict) else 'Unavailable video'
+        print(f'[{index}/{len(entries)}] {title}', flush=True)
+        video_url = f'https://www.youtube.com/watch?v={video_id}' if video_id else None
+        try:
+            if not isinstance(video_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id):
+                raise TubeBoxError('Playlist entry has no valid YouTube video ID.')
+            # Reuse the single-video workflow; each call completes before the next starts.
+            item = argparse.Namespace(**vars(args))
+            item.url = video_url
+            add(item)
+            added += 1
+        except (TubeBoxError, OSError, configparser.Error, argparse.ArgumentTypeError) as exc:
+            failures.append((video_url or title, str(exc)))
+            print(f'tubebox: {video_url or title}: {exc}', file=sys.stderr)
+    print(f'Playlist summary: {added} added, {len(failures)} failed, {len(entries)} listed.')
+    if failures:
+        print('Failed entries:', file=sys.stderr)
+        for source, reason in failures:
+            print(f'  {source}: {reason}', file=sys.stderr)
+    return 1 if failures else 0
+
+
 def add(args):
     config = load_config(args.config)
     fps = fps_limit(getattr(args, 'fps', None) or config['fps'])
@@ -274,14 +327,15 @@ def main(argv=None):
     init.add_argument('--resolution', type=resolution_argument,
                       help='Maximum video height, e.g. 720p or 1080p (all downloads capped at 1080p)')
     init.add_argument('--fps', type=int, choices=(30, 60), help='Save a frame rate cap (default: 30)')
-    download = commands.add_parser('add', help='Download one permitted video with artwork')
+    download = commands.add_parser('add', help='Download a permitted video or YouTube playlist with artwork')
     download.add_argument('url')
     download.add_argument('--folder', help='Override the creator folder')
     download.add_argument('--name', help='Override the video title')
     download.add_argument('--fps', type=int, choices=(30, 60), help='Override the saved frame rate cap for this download')
     download.add_argument('--season', type=number)
     download.add_argument('--episode', type=number)
-    download.add_argument('-y', '--yes', action='store_true', help='Accept defaults without prompts')
+    download.add_argument('-y', '--yes', '--use-defaults', action='store_true', help='Accept defaults without prompts')
+    download.add_argument('--playlist', action='store_true', help='Add every video in a YouTube playlist sequentially')
     normalizer = commands.add_parser('normalize', help='Normalize existing videos for Pi 3 playback')
     normalizer.add_argument('path', type=Path, help='Video file or directory to scan recursively')
     normalizer.add_argument('--dry-run', action='store_true', help='Inspect and report without modifying media')
@@ -320,6 +374,11 @@ def main(argv=None):
             from .normalize import normalize
             return normalize(args)
         else:
+            if args.playlist:
+                playlist = youtube_playlist_url(args.url)
+                if not playlist:
+                    raise TubeBoxError('--playlist requires a YouTube URL containing a list parameter.')
+                return add_playlist(args, playlist)
             add(args)
     except (TubeBoxError, OSError, configparser.Error, argparse.ArgumentTypeError) as exc:
         print(f'tubebox: {exc}', file=sys.stderr)

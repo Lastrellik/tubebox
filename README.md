@@ -10,6 +10,29 @@ your library, including libraries on mounted SMB shares.
 tubebox add "<permitted-video-url>"
 ```
 
+For a YouTube playlist, add `--playlist`. Videos are processed sequentially
+in playlist order. Use `--use-defaults` (also `--yes` or `-y`) to accept
+defaults without prompts:
+
+```bash
+tubebox add "<permitted-youtube-playlist-url>" --playlist --use-defaults
+```
+
+Both playlist URLs and video URLs containing a `list` parameter work. Without
+`--playlist`, a video URL adds only that video. Each playlist video uses its
+own creator folder and source title, and keeps the usual artwork and storage
+behavior. `--folder`, `--season`, and `--fps` apply to every entry; `--name`
+and `--episode` are reserved for single videos. Without `--use-defaults`,
+interactive terminals prompt for each video's options as usual.
+
+Existing entries are detected by the selected folder and filename, not by
+YouTube video ID. They are not downloaded or overwritten, but count as
+failures in the summary. Other failed entries are also reported, and
+processing continues. A final summary reports additions and failures;
+the command exits nonzero if any listed entry fails. YouTube may hide
+unavailable entries; TubeBox can only attempt the entries YouTube lists.
+Press Ctrl-C to stop the playlist.
+
 ## Install and Set Up
 
 TubeBox runs on macOS and Linux with Python 3.10 or newer. Install
